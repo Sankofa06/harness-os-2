@@ -56,6 +56,45 @@ Format: decision / reason / alternatives / consequences.
 - Reason: specs must be versioned and referenceable from code/tests; the repo previously contained only the zip.
 - Consequences: root README.md describes the implementation and links to the kit docs.
 
+## D-014 — License selection deferred to project owner
+- Decision: ship a placeholder `LICENSE` file and `license = "LicenseRef-Pending"` in
+  `pyproject.toml` rather than choosing an open-source license unilaterally.
+- Reason: license choice (MIT/Apache-2.0/AGPL/proprietary/etc.) has legal and business
+  consequences for the project owner that a spec kit cannot answer on their behalf;
+  SPEC/DEFINITION_OF_DONE.md only requires the decision to be *documented*, not made.
+- Alternatives: default to MIT (common OSS default) or Apache-2.0.
+- Consequences: `REL-004`'s final audit should re-flag this until the owner picks a
+  license; MARKETING copy that references "open-source" should wait for that choice.
+
+## D-013 — CORS enabled by default for the WebUI dev server origin only
+- Decision: `security.cors_origins` defaults to `http://localhost:5173` /
+  `http://127.0.0.1:5173` (the Vite dev server); the API adds `CORSMiddleware` only
+  when the list is non-empty, so setting it to `[]` disables CORS entirely (e.g. once
+  a production build serves the WebUI from the same origin as the API).
+- Reason: `harness serve` and `npm run dev` are separate processes/ports per
+  DEPLOYMENT.md; without CORS the browser blocks every WebUI→API request, which would
+  make SPEC/DEFINITION_OF_DONE.md's WebUI section untestable in dev.
+- Alternatives: reverse-proxy the two behind one origin in dev (adds a dependency);
+  wildcard `*` origin (too permissive given bearer-token auth headers).
+- Consequences: production/packaged builds that serve WebUI static assets from the API
+  process should set `security.cors_origins: []`.
+
+## D-012 — Vertical-slice WebUI client is hand-written, pending WEB-011 codegen
+- Decision: `web/src/api/client.ts` hand-declares types for only the endpoints the
+  vertical-slice chat view calls (health, contacts, sessions, messages).
+- Reason: SPEC/API_CONTRACT.md requires a TS client generated from `/openapi.json`
+  (WEB-011), but generating it needs the OpenAPI surface to stabilize past the kernel
+  slice; blocking the vertical-slice proof on codegen tooling would stall Phase 4.
+- Alternatives: wire up openapi-typescript now against the partial API.
+- Consequences: WEB-011 must delete this hand-written client and replace all call
+  sites with the generated one — tracked so it isn't mistaken for the final shape.
+
+## D-011 — Role carries a system prompt, not a binding
+- Decision: `Role` (core/domain.py) contributes `system_prompt` to the context compiler but no `provider`/`model`/host fields. The "role default" level in the 5-level binding precedence (SPEC/ARCHITECTURE.md) is therefore a defined no-op in v1: it participates in precedence order but never supplies a value, so resolution falls through to contact/system.
+- Reason: SPEC/CONTACTS_ROLES_PERSONAS.md's Role example shows only responsibility/permissions, never model/host defaults; CONFIG/examples/contact.example.yaml is where `binding` first appears. Adding an unused field speculatively would violate AGENTS.md's "no placeholders" rule.
+- Alternatives: give Role a `binding: Binding` field now.
+- Consequences: if a future requirement needs per-role default models, add the field then; `resolve_binding()` already accepts a `role` argument so the change is additive, not a rework.
+
 ## D-010 — Fake provider is a first-class adapter, not test-only code
 - Decision: the deterministic provider (LP-002) ships in `harness.providers.language.fake` as a real adapter used by demo mode (`HARNESS_DEMO_MODE=1`) and CI.
 - Reason: SPEC/UI_UX.md seeded screenshot mode requires deterministic fictional data with no network; DoD requires fixture-exercised adapters.

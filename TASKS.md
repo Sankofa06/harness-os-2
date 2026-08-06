@@ -14,19 +14,19 @@ Task format: ID — title / description / deps / components / acceptance / tests
 - Desc: `pyproject.toml` (uv-managed, Python 3.12), `src/harness` package layout with module boundaries per SPEC/ARCHITECTURE.md, ruff + mypy + pytest config, `.gitignore`, `.env.example`.
 - Deps: none. Components: repo root.
 - Acceptance: `uv sync` succeeds; `ruff check`, `mypy`, `pytest` all runnable; `harness --help` entrypoint works.
-- Tests: CI runs lint/type/test. Status: TODO
+- Tests: CI runs lint/type/test. Status: DONE
 
 ### SCAF-002 [VS] Web package scaffold
 - Desc: `web/` Vite + React + TypeScript app, ESLint/prettier-free minimal config, Vitest set up.
 - Deps: none. Components: web.
 - Acceptance: `npm install && npm run build && npm test` succeed.
-- Tests: vitest smoke test. Status: TODO
+- Tests: vitest smoke test. Status: DONE
 
 ### SCAF-003 [VS] CI skeleton
 - Desc: GitHub Actions workflow: backend lint/typecheck/test, web build/test.
 - Deps: SCAF-001, SCAF-002. Components: .github.
 - Acceptance: workflow file valid; all steps pass locally.
-- Tests: the CI itself. Status: TODO
+- Tests: the CI itself. Status: DONE
 
 ---
 
@@ -36,67 +36,67 @@ Task format: ID — title / description / deps / components / acceptance / tests
 - Desc: ULID-style time-sortable IDs with entity prefixes (`host_`, `run_`, `art_`, …) per SPEC/DATA_MODEL.md.
 - Deps: SCAF-001. Components: core.
 - Acceptance: IDs unique, sortable, prefix-validated.
-- Tests: unit tests for format/monotonicity. Status: TODO
+- Tests: unit tests for format/monotonicity. Status: DONE
 
 ### CORE-002 [VS] Config system with precedence
 - Desc: Pydantic v2 settings: defaults ← YAML config file ← env vars (`HARNESS_*`) ← CLI flags. Includes context budget targets, server bind, auth mode, data dir. Mirrors CONFIG/examples/harness.example.yaml.
 - Deps: SCAF-001. Components: core.
 - Acceptance: precedence order provable; example config loads.
-- Tests: unit tests for each precedence layer. Status: TODO
+- Tests: unit tests for each precedence layer. Status: DONE
 
 ### CORE-003 [VS] Error taxonomy + capability vocabulary
 - Desc: typed error hierarchy (NotFound/Validation/Permission/Provider/Adapter…); capability enums for hosts, providers (L0–L5), permission classes.
 - Deps: SCAF-001. Components: core.
 - Acceptance: API maps errors to structured JSON with correlation IDs.
-- Tests: unit + API error-shape tests. Status: TODO
+- Tests: unit + API error-shape tests. Status: DONE
 
 ### DB-001 [VS] SQLite engine + migration runner
 - Desc: async SQLAlchemy (aiosqlite), sequential SQL migrations table, applies on startup, WAL mode.
 - Deps: SCAF-001. Components: persistence.
 - Acceptance: clean DB is created and migrated on first start; re-running is idempotent.
-- Tests: unit tests migrate empty DB, re-migrate. Status: TODO
+- Tests: unit tests migrate empty DB, re-migrate. Status: DONE
 
 ### DB-002 [VS] Kernel schema migration
 - Desc: tables needed by kernel + slice: settings, secret_refs, roles, personas, contacts, contact_personas, teams, team_members, sessions, session_members, messages, runs, run_metrics, binding_snapshots, events, jobs. Remaining SPEC/DATA_MODEL.md tables land with their subsystems (see DECISIONS.md D-004).
 - Deps: DB-001. Components: persistence.
 - Acceptance: schema matches SPEC/DATA_MODEL.md naming; opaque IDs used.
-- Tests: migration + repository round-trip tests. Status: TODO
+- Tests: migration + repository round-trip tests. Status: DONE
 
 ### EVT-001 [VS] Event model + append-only store
 - Desc: Event envelope (event_id, type, timestamp, correlation_id, resource, payload) per SPEC/API_CONTRACT.md; append-only `events` table with monotonic cursor; retention policy hook.
 - Deps: DB-002. Components: events, persistence.
 - Acceptance: events persist with cursor ordering; payloads versioned.
-- Tests: unit store/replay tests. Status: TODO
+- Tests: unit store/replay tests. Status: DONE
 
 ### EVT-002 [VS] In-process event bus
 - Desc: asyncio pub/sub with per-subscriber queues, type/resource filters, backpressure-safe fanout; persistence tap.
 - Deps: EVT-001. Components: events.
 - Acceptance: publisher never blocks on slow subscriber; filters work.
-- Tests: unit tests incl. slow-subscriber. Status: TODO
+- Tests: unit tests incl. slow-subscriber. Status: DONE
 
 ### API-001 [VS] ASGI app factory + system endpoints
 - Desc: FastAPI app, `/api/v1` versioned router, `GET /health`, `GET /system/info`, `GET /capabilities`, OpenAPI at `/openapi.json`, structured error handler, correlation IDs on mutations.
 - Deps: CORE-002, CORE-003. Components: api.
 - Acceptance: DoD "API" bullets 1–3; docs served in dev mode.
-- Tests: API contract tests. Status: TODO
+- Tests: API contract tests. Status: DONE
 
 ### API-002 [VS] `harness serve` CLI
 - Desc: CLI entrypoint binding host/port from config/flags (default 127.0.0.1:4096).
 - Deps: API-001. Components: api, cli.
 - Acceptance: `harness serve --host 127.0.0.1 --port 4096` boots server + DB + bus.
-- Tests: subprocess smoke test in integration suite. Status: TODO
+- Tests: subprocess smoke test in integration suite. Status: DONE
 
 ### AUTH-001 [VS] Token authentication
 - Desc: bearer-token auth; token auto-generated into data dir (0600). Loopback requests trusted when `auth.local_trust` (default true); non-loopback always requires token. Applies to REST + WebSocket.
 - Deps: API-001. Components: api, core.
 - Acceptance: unauthenticated remote request → 401; WS unauthenticated → closed; loopback dev flow works.
-- Tests: API + WS auth tests. Status: TODO
+- Tests: API + WS auth tests. Status: DONE
 
 ### API-003 [VS] WebSocket event stream
 - Desc: `/api/v1/events` WS; subscribe message with filters (session IDs, job IDs, host IDs, event types); replay from cursor; heartbeat.
 - Deps: EVT-002, AUTH-001. Components: api, events.
 - Acceptance: authenticated client subscribes/filters/replays; unauthenticated rejected.
-- Tests: WS integration tests. Status: TODO
+- Tests: WS integration tests. Status: DONE
 
 ### SEC-001 Secrets abstraction
 - Desc: secret store chain — OS keyring → encrypted local file → env-var reference; `secret_refs` metadata table; `/secrets/metadata`, `/secrets/{id}/test`; values never serialized.
@@ -146,13 +146,13 @@ Task format: ID — title / description / deps / components / acceptance / tests
 - Desc: adapter protocol with capability levels L0–L5 (SPEC/PROVIDER_MATRIX.md): chat streaming, tools, model discovery, lifecycle, telemetry, native extras; typed request/response; usage reporting.
 - Deps: CORE-003. Components: providers.language.
 - Acceptance: contract supports all matrix rows without core changes.
-- Tests: contract conformance suite reused by all adapters. Status: TODO
+- Tests: contract conformance suite reused by all adapters. Status: DONE
 
 ### LP-002 [VS] Deterministic fake provider
 - Desc: in-process provider fixture: scripted/deterministic streaming, token usage, TTFT simulation; used by demo mode and CI.
 - Deps: LP-001. Components: providers.language.
 - Acceptance: streams deterministic output with usage metrics.
-- Tests: conformance suite. Status: TODO
+- Tests: conformance suite. Status: DONE
 
 ### LP-003 Generic OpenAI-compatible adapter
 - Desc: base URL + API key + model list when available; streaming chat + tools (L1).
@@ -250,37 +250,37 @@ Task format: ID — title / description / deps / components / acceptance / tests
 - Desc: CRUD + seed roles (orchestrator, architect, researcher, coder, reviewer, tester, designer, operator) and demo personas; persona token budget 50–200 with deterministic stacking precedence.
 - Deps: DB-002, API-001. Components: agents, api.
 - Acceptance: CRUD works; seeds present; persona conflicts resolve deterministically.
-- Tests: API + unit stacking tests. Status: TODO
+- Tests: API + unit stacking tests. Status: DONE
 
 ### AGT-002 [VS] Contacts + teams
 - Desc: contacts CRUD with handle/display/role/personas/binding; teams with members; identity stable across binding changes.
 - Deps: AGT-001. Components: agents, api.
 - Acceptance: DoD Agents bullets 1; contact history survives model change.
-- Tests: API + identity tests. Status: TODO
+- Tests: API + identity tests. Status: DONE
 
 ### AGT-003 [VS] Mention parser
 - Desc: `@contact`, multiple, `@team`, `@everyone`, natural delegation inference; explicit mention bypasses orchestrator per room policy.
 - Deps: AGT-002. Components: agents.
 - Acceptance: parser cases from SPEC/CONTACTS_ROLES_PERSONAS.md pass.
-- Tests: unit parser suite. Status: TODO
+- Tests: unit parser suite. Status: DONE
 
 ### AGT-004 [VS] Binding resolution + snapshots
 - Desc: 5-level precedence (turn > session/contact > contact > role > system); every run persists resolved snapshot to binding_snapshots.
 - Deps: AGT-002, LP-001. Components: agents, persistence.
 - Acceptance: DoD Agents binding bullets; `PATCH /sessions/{id}/contacts/{cid}/binding` + `POST /sessions/{id}/turn-overrides` work.
-- Tests: unit precedence + API integration. Status: TODO
+- Tests: unit precedence + API integration. Status: DONE
 
 ### CTX-001 [VS] Token estimator + budget report
 - Desc: pluggable token estimator (heuristic default, see DECISIONS.md D-006); budget report JSON per SPEC/CONTEXT_COMPILER.md with per-section counts.
 - Deps: CORE-002. Components: context.
 - Acceptance: report shape matches spec; exposed to UI + `context.compiled` event.
-- Tests: unit budget math. Status: TODO
+- Tests: unit budget math. Status: DONE
 
 ### CTX-002 [VS] Context compiler layers
 - Desc: 11-layer assembly (protocol, role, personas, session state, recent conversation, workspace facts, skills, tools, MCP, artifact excerpts, task memory); lazy capability surface (`capabilities.search`, `skills.activate`, `tools.describe`, `artifacts.get`, `agents.delegate`).
 - Deps: CTX-001, AGT-004. Components: context.
 - Acceptance: bootstrap ≤4K; nothing eager-injected.
-- Tests: compile fixtures + budget assertions. Status: TODO
+- Tests: compile fixtures + budget assertions. Status: DONE
 
 ### CTX-003 Transcript management
 - Desc: recent window, structured session state, rolling summaries, preserved tool outcomes/artifact refs; never summarize away unresolved requirements/plan/changed files/failing tests/permission decisions.
@@ -298,7 +298,7 @@ Task format: ID — title / description / deps / components / acceptance / tests
 - Desc: `POST /sessions/{id}/messages` → mention routing → run per target contact → compile → stream inference → events (run.started, run.binding_snapshot, context.compiled, inference.*) → persist messages + run_metrics.
 - Deps: AGT-003, AGT-004, CTX-002, LP-002, API-003. Components: agents, api.
 - Acceptance: vertical-slice items 9–12; streamed deltas visible over WS.
-- Tests: end-to-end API test with fake provider. Status: TODO
+- Tests: end-to-end API test with fake provider. Status: DONE
 
 ### AGT-006 Delegation + orchestration graph
 - Desc: `agents.delegate` tool, agent.spawned/completed events, `GET /sessions/{id}/graph` (nodes: user/orchestrator/contacts/jobs/tools; edges: delegation/handoff; statuses).
@@ -450,13 +450,13 @@ Task format: ID — title / description / deps / components / acceptance / tests
 - Desc: dark control-room shell, three-panel desktop layout, navigation (Chats/Agents/Workspaces/Compute/Models/Creative/Assets/Skills/MCP/Analytics/Settings), theme tokens, reduced-motion, WCAG AA base.
 - Deps: SCAF-002, API-001. Components: web.
 - Acceptance: shell renders; nav works; auth connect flow.
-- Tests: vitest + Playwright smoke. Status: TODO
+- Tests: vitest + Playwright smoke. Status: IN_PROGRESS
 
 ### WEB-002 [VS] Chat view
 - Desc: streaming conversation, contact chips, composer, context meter, speed indicator; via REST + WS only.
 - Deps: WEB-001, AGT-005. Components: web.
 - Acceptance: vertical-slice item 13.
-- Tests: Playwright chat flow vs fake provider. Status: TODO
+- Tests: Playwright chat flow vs fake provider. Status: IN_PROGRESS
 
 ### WEB-003 Graph view
 - Desc: animated directed execution graph with statuses; node → inspector; infra events shown.
@@ -507,13 +507,13 @@ Task format: ID — title / description / deps / components / acceptance / tests
 - Desc: sessions list, conversation, mentions, streaming via WS.
 - Deps: TUI-001, AGT-005. Components: tui.
 - Acceptance: vertical-slice item 14; concurrent with WebUI.
-- Tests: TUI integration tests (Textual pilot). Status: TODO
+- Tests: TUI integration tests (Textual pilot). Status: DONE
 
 ### TUI-003 TUI feature completion
 - Desc: graph/status, contacts, hosts, files, model settings, approvals.
 - Deps: TUI-002 + backend tasks. Components: tui.
 - Acceptance: DoD TUI bullets.
-- Tests: pilot tests per screen. Status: TODO
+- Tests: pilot tests per screen. Status: IN_PROGRESS
 
 ### WEB-012 Accessibility audit
 - Desc: WCAG AA checks, keyboard nav, touch targets ≥44px, no color-only signals.

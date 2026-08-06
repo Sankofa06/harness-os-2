@@ -1,0 +1,79 @@
+/* Dark technical control room, not cyberpunk cliché (SPEC/UI_UX.md). Light theme is the
+   inverse for accessibility, though the product direction leads with dark. */
+
+:root {
+  --bg-0: #0b0d10;
+  --bg-1: #12151a;
+  --bg-2: #191d24;
+  --border: #262b33;
+  --text-0: #e8ebf0;
+  --text-1: #a8b0bd;
+  --text-2: #6b7280;
+  --accent: #4fd1c5;
+  --accent-dim: #2c7a72;
+  --danger: #f56565;
+  --warn: #ecc94b;
+  --ok: #48bb78;
+  --focus: #7dd3fc;
+  --radius: 6px;
+  --font-mono: "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg-0: #f5f6f8;
+    --bg-1: #ffffff;
+    --bg-2: #eceef1;
+    --border: #d7dae0;
+    --text-0: #12151a;
+    --text-1: #4a5160;
+    --text-2: #767d8a;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg-0);
+  color: var(--text-0);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  min-height: 44px;
+  min-width: 44px;
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}

@@ -1,0 +1,8 @@
+License: TO BE DETERMINED
+
+This repository does not yet have a selected open-source license. `pyproject.toml`
+uses the placeholder identifier `LicenseRef-Pending` until a license is chosen.
+
+See DECISIONS.md ("License selection deferred to project owner") for the reasoning.
+Until a license is added, no rights are granted to use, copy, modify, or distribute
+this software beyond what is necessary to view the source.
