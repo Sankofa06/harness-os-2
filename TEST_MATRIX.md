@@ -6,20 +6,21 @@ names; file paths may evolve. Status: PLANNED / IMPLEMENTED / PASSING.
 ## API
 | DoD requirement | Test | Status |
 |---|---|---|
-| Server starts from clean install with one command | `tests/integration/test_serve_smoke.py::test_clean_boot` | PLANNED |
-| /health, OpenAPI, REST, WS work | `tests/api/test_system.py`, `tests/api/test_events_ws.py` | PLANNED |
-| API versioned under /api/v1 | `tests/api/test_system.py::test_versioned_prefix` | PLANNED |
-| Bind localhost or chosen interface/port | `tests/unit/test_config.py::test_bind_config` | PLANNED |
-| Auth protects remote access | `tests/api/test_auth.py` (REST + WS, loopback vs remote) | PLANNED |
-| API contract tests pass | `tests/api/` suite + OpenAPI schema snapshot | PLANNED |
+| Server starts from clean install with one command | `tests/integration/test_serve_smoke.py::test_clean_boot` | PASSING |
+| /health, OpenAPI, REST, WS work | `tests/api/test_system.py`, `tests/api/test_events_ws.py` | PASSING |
+| API versioned under /api/v1 | `tests/api/test_system.py::test_versioned_prefix` | PASSING |
+| Bind localhost or chosen interface/port | `tests/unit/test_config.py`, `test_serve_smoke.py` (custom port) | PASSING |
+| Auth protects remote access | `tests/api/test_auth.py` (REST), `tests/api/test_events_ws.py` (WS) — both loopback vs remote+token | PASSING |
+| API contract tests pass | `tests/api/` suite + OpenAPI schema snapshot | IMPLEMENTED (no frozen snapshot yet) |
+| Long actions create cancelable Jobs with a persisted state machine and event trail | `tests/unit/test_jobs.py`, `tests/api/test_jobs.py` | PASSING |
 
 ## Context
-| Bootstrap ≤ 4K tokens | `tests/context/test_budget_regression.py::test_bootstrap_budget` | PLANNED |
-| Coding-session overhead ≤ 8K | `tests/context/test_budget_regression.py::test_session_overhead` | PLANNED |
-| Full expansion ≤ 16K | `tests/context/test_budget_regression.py::test_expanded_budget` | PLANNED |
-| Tool/MCP/skill bodies lazy | `tests/context/test_lazy_loading.py` | PLANNED |
-| Budget report works | `tests/context/test_compiler.py::test_budget_report_shape` | PLANNED |
-| Regression on eager injection | `test_budget_regression.py` fails on eager schema injection | PLANNED |
+| Bootstrap ≤ 4K tokens | `tests/context/test_compiler.py::test_bootstrap_budget_under_4k` | PASSING |
+| Coding-session overhead ≤ 8K | `tests/context/test_compiler.py::test_history_is_trimmed_to_budget` | PASSING |
+| Full expansion ≤ 16K | `tests/context/test_compiler.py::test_full_expansion_soft_limit` | PASSING |
+| Tool/MCP/skill bodies lazy | `tests/context/test_compiler.py::test_activated_skill_adds_cost_only_when_activated` | PASSING |
+| Budget report works | `tests/context/test_compiler.py` (`BudgetReport` shape) | PASSING |
+| Regression on eager injection | `tests/context/test_compiler.py::test_no_tools_or_skills_means_zero_cost_sections` | PASSING |
 
 ## Providers
 | Generic OpenAI-compatible works | `tests/providers/test_openai_compat.py` vs fake server | PLANNED |
@@ -41,11 +42,11 @@ names; file paths may evolve. Status: PLANNED / IMPLEMENTED / PASSING.
 | GPU telemetry where supported / sensor degradation | `tests/node/test_telemetry.py::test_missing_sensor_ok` | PLANNED |
 
 ## Agents
-| Create Role/Persona/Contact/Team | `tests/api/test_agents_crud.py` | PLANNED |
-| Mention one/many/team | `tests/unit/test_mentions.py`, `tests/api/test_run_loop.py` | PLANNED |
-| Rebind global/session/turn + snapshots | `tests/unit/test_binding_precedence.py`, `tests/api/test_binding_overrides.py` | PLANNED |
-| Parallel plan→review→implement | `tests/integration/test_orchestration.py` | PLANNED |
-| Stop/cancel | `tests/api/test_stop.py` | PLANNED |
+| Create Role/Persona/Contact/Team | `tests/api/test_agents_crud.py` | PASSING |
+| Mention one/many/team | `tests/unit/test_mentions.py`, `tests/api/test_run_loop.py` | PASSING |
+| Rebind global/session/turn + snapshots | `tests/unit/test_binding.py`, `tests/api/test_run_loop.py::test_session_binding_override_...` | PASSING |
+| Parallel plan→review→implement | `tests/integration/test_orchestration.py` | PLANNED (needs AGT-006 delegation) |
+| Stop/cancel | `tests/api/test_stop.py` | PLANNED (needs AGT-007; job cancel alone is covered) |
 
 ## MCP / skills / tools
 | Add MCP server; compact index; lazy schema | `tests/mcp/test_lazy_index.py` | PLANNED |

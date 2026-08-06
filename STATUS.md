@@ -3,14 +3,12 @@
 _Last updated: 2026-08-06_
 
 ## Current milestone
-Phase 4 vertical slice complete and proven end-to-end (real server, real SQLite DB,
-real browser via Playwright against the real API and Vite dev server). Milestone 1
-(kernel) is now fully done, including SEC-001 (secrets abstraction). Moving into
-Milestone 2 (control plane).
+Phase 4 vertical slice complete and proven end-to-end. Milestone 1 (kernel) is fully
+done: kernel domain/persistence/events/API, SEC-001 (secrets), and JOB-001 (job
+engine) all implemented and tested. Moving into Milestone 2 (control plane).
 
 ## Active task
-None in flight. Next up per `TASKS.md`: JOB-001 (job engine), then CP-001 (capability
-registry).
+None in flight. Next up per `TASKS.md`: CP-001 (capability registry).
 
 ## Completed milestones
 - Phase 1: full spec-kit reading pass (all `SPEC/`, `ADR/`, `BUILD/`, `TESTING/`,
@@ -44,7 +42,7 @@ registry).
       a plain HTTP client, no direct DB/runtime access).
 
 ## Known failures
-None functionally. 69/69 backend tests pass, 1/1 web unit test passes, 1/1 Playwright
+None functionally. 76/76 backend tests pass, 1/1 web unit test passes, 1/1 Playwright
 e2e test passes. `ruff check`, `ruff format --check`, and `mypy --strict` are clean on
 `src/harness`. `eslint`, `vitest`, and `tsc -b && vite build` are clean on `web/`.
 Cosmetic: some test runs emit a `PytestUnhandledThreadExceptionWarning` from an

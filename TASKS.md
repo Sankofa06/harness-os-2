@@ -108,7 +108,7 @@ Task format: ID — title / description / deps / components / acceptance / tests
 - Desc: cancelable async jobs with state machine (queued/running/succeeded/failed/canceled), `/jobs`, `/jobs/{id}`, `POST /jobs/{id}/cancel`, job events.
 - Deps: EVT-002, DB-002. Components: jobs, api.
 - Acceptance: long actions create Jobs; cancel works mid-run.
-- Tests: unit state machine + API integration. Status: TODO
+- Tests: unit state machine + API integration. Status: DONE
 
 ---
 

@@ -21,6 +21,7 @@ from harness.core.domain import Binding
 from harness.core.secrets import SecretStore
 from harness.events.bus import EventBus
 from harness.events.model import Event
+from harness.jobs.manager import JobManager
 from harness.persistence.db import Database
 from harness.persistence.repos import (
     ContactRepo,
@@ -33,6 +34,7 @@ from harness.persistence.repos import (
     SessionRepo,
     TeamRepo,
 )
+from harness.persistence.repos_jobs import JobRepo
 from harness.providers.language.fake import FakeProvider
 from harness.providers.language.registry import ProviderRegistry
 
@@ -56,6 +58,8 @@ class Application:
     runs: RunRepo
     secret_refs: SecretRefRepo
     secret_store: SecretStore
+    jobs: JobRepo
+    job_manager: JobManager
     providers: ProviderRegistry
     compiler: ContextCompiler
     api_token: str
@@ -109,6 +113,8 @@ async def create_application(config: HarnessConfig | None = None) -> Application
     runs = RunRepo(db)
     secret_refs = SecretRefRepo(db)
     secret_store = SecretStore(config.data_dir)
+    jobs = JobRepo(db)
+    job_manager = JobManager(repo=jobs, bus=bus)
 
     await seed_agents(roles, personas)
 
@@ -131,6 +137,8 @@ async def create_application(config: HarnessConfig | None = None) -> Application
         runs=runs,
         secret_refs=secret_refs,
         secret_store=secret_store,
+        jobs=jobs,
+        job_manager=job_manager,
         providers=providers,
         compiler=compiler,
         api_token=token,
