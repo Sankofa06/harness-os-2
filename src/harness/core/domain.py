@@ -7,6 +7,15 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 
+class SecretRef(BaseModel):
+    """Metadata only — never carries the secret value (SPEC/SECURITY_PRIVACY.md)."""
+
+    id: str
+    name: str
+    kind: Literal["keyring", "file", "env"]
+    target: str
+
+
 class Role(BaseModel):
     id: str
     name: str

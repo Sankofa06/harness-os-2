@@ -102,7 +102,7 @@ Task format: ID — title / description / deps / components / acceptance / tests
 - Desc: secret store chain — OS keyring → encrypted local file → env-var reference; `secret_refs` metadata table; `/secrets/metadata`, `/secrets/{id}/test`; values never serialized.
 - Deps: DB-002, API-001. Components: core, persistence, api.
 - Acceptance: no secret value in DB/logs/events/API responses.
-- Tests: unit + redaction tests. Status: TODO
+- Tests: unit + redaction tests. Status: DONE
 
 ### JOB-001 Job engine
 - Desc: cancelable async jobs with state machine (queued/running/succeeded/failed/canceled), `/jobs`, `/jobs/{id}`, `POST /jobs/{id}/cancel`, job events.

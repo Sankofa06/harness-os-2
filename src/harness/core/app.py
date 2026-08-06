@@ -8,16 +8,17 @@ here depends on FastAPI, so the TUI or a future client can build the same contex
 from __future__ import annotations
 
 import os
-import secrets
 import stat
 from dataclasses import dataclass, field
 from pathlib import Path
+from secrets import token_urlsafe
 
 from harness.agents.seeds import seed_agents
 from harness.context.compiler import ContextCompiler
 from harness.context.tokens import HeuristicEstimator
 from harness.core.config import HarnessConfig
 from harness.core.domain import Binding
+from harness.core.secrets import SecretStore
 from harness.events.bus import EventBus
 from harness.events.model import Event
 from harness.persistence.db import Database
@@ -28,6 +29,7 @@ from harness.persistence.repos import (
     PersonaRepo,
     RoleRepo,
     RunRepo,
+    SecretRefRepo,
     SessionRepo,
     TeamRepo,
 )
@@ -52,6 +54,8 @@ class Application:
     sessions: SessionRepo
     messages: MessageRepo
     runs: RunRepo
+    secret_refs: SecretRefRepo
+    secret_store: SecretStore
     providers: ProviderRegistry
     compiler: ContextCompiler
     api_token: str
@@ -69,7 +73,7 @@ def _load_or_create_token(data_dir: Path) -> str:
     if token_path.exists():
         return token_path.read_text().strip()
     data_dir.mkdir(parents=True, exist_ok=True)
-    token = secrets.token_urlsafe(32)
+    token = token_urlsafe(32)
     token_path.write_text(token)
     os.chmod(token_path, stat.S_IRUSR | stat.S_IWUSR)
     return token
@@ -103,6 +107,8 @@ async def create_application(config: HarnessConfig | None = None) -> Application
     sessions = SessionRepo(db)
     messages = MessageRepo(db)
     runs = RunRepo(db)
+    secret_refs = SecretRefRepo(db)
+    secret_store = SecretStore(config.data_dir)
 
     await seed_agents(roles, personas)
 
@@ -123,6 +129,8 @@ async def create_application(config: HarnessConfig | None = None) -> Application
         sessions=sessions,
         messages=messages,
         runs=runs,
+        secret_refs=secret_refs,
+        secret_store=secret_store,
         providers=providers,
         compiler=compiler,
         api_token=token,

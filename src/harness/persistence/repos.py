@@ -16,6 +16,7 @@ from harness.core.domain import (
     Run,
     RunMetrics,
     RunStatus,
+    SecretRef,
     Session,
     Team,
 )
@@ -23,6 +24,40 @@ from harness.core.errors import ConflictError, NotFoundError
 from harness.core.ids import new_id
 from harness.events.model import Event, EventResource
 from harness.persistence.db import Database
+
+
+class SecretRefRepo:
+    def __init__(self, db: Database) -> None:
+        self._db = db
+
+    async def create(self, secret_ref: SecretRef) -> SecretRef:
+        if await self._db.fetch_one(
+            "SELECT id FROM secret_refs WHERE name = :n", {"n": secret_ref.name}
+        ):
+            raise ConflictError(f"secret ref name already exists: {secret_ref.name}")
+        await self._db.execute(
+            "INSERT INTO secret_refs (id, name, kind, target) VALUES (:id, :name, :kind, :target)",
+            secret_ref.model_dump(),
+        )
+        return secret_ref
+
+    async def get(self, secret_ref_id: str) -> SecretRef:
+        row = await self._db.fetch_one(
+            "SELECT * FROM secret_refs WHERE id = :id", {"id": secret_ref_id}
+        )
+        if row is None:
+            raise NotFoundError(f"secret ref not found: {secret_ref_id}")
+        return SecretRef(id=row["id"], name=row["name"], kind=row["kind"], target=row["target"])
+
+    async def list(self) -> list[SecretRef]:
+        rows = await self._db.fetch_all("SELECT * FROM secret_refs ORDER BY name")
+        return [
+            SecretRef(id=r["id"], name=r["name"], kind=r["kind"], target=r["target"]) for r in rows
+        ]
+
+    async def delete(self, secret_ref_id: str) -> None:
+        await self.get(secret_ref_id)
+        await self._db.execute("DELETE FROM secret_refs WHERE id = :id", {"id": secret_ref_id})
 
 
 class RoleRepo:

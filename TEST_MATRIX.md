@@ -99,3 +99,4 @@ names; file paths may evolve. Status: PLANNED / IMPLEMENTED / PASSING.
 
 ## Security (TESTING/TEST_STRATEGY.md)
 | Traversal / unauthorized API / secret redaction / malicious markdown / command injection / WS auth | `tests/security/` suite | PLANNED |
+| Secret values never returned by any endpoint or persisted in plaintext | `tests/unit/test_secrets.py`, `tests/api/test_secrets.py` | PASSING |

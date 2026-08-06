@@ -21,6 +21,7 @@ dependencies = [
 [project.optional-dependencies]
 ssh = ["asyncssh>=2.17"]
 node = ["psutil>=6.0"]
+secrets = ["keyring>=25.0", "cryptography>=43.0"]
 
 [project.scripts]
 harness = "harness.cli:main"
@@ -32,6 +33,7 @@ dev = [
     "mypy>=1.13",
     "ruff>=0.8",
     "types-pyyaml",
+    "cryptography>=43.0",
 ]
 
 [build-system]
@@ -60,7 +62,7 @@ packages = ["harness"]
 mypy_path = "src"
 
 [[tool.mypy.overrides]]
-module = ["textual.*"]
+module = ["textual.*", "keyring.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

@@ -13,7 +13,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from harness.api.routes import agents, events, sessions, system
+from harness.api.routes import agents, events, secrets, sessions, system
 from harness.core.app import Application, create_application
 from harness.core.config import HarnessConfig, SecurityConfig
 from harness.core.errors import HarnessError
@@ -73,5 +73,6 @@ def create_app(
     app.include_router(agents.router, prefix=API_PREFIX)
     app.include_router(sessions.router, prefix=API_PREFIX)
     app.include_router(events.router, prefix=API_PREFIX)
+    app.include_router(secrets.router, prefix=API_PREFIX)
 
     return app
