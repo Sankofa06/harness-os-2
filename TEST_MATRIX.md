@@ -27,7 +27,11 @@ names; file paths may evolve. Status: PLANNED / IMPLEMENTED / PASSING.
 | LM Studio native discovery/lifecycle/settings | `tests/providers/test_lmstudio.py` vs fixture | PLANNED |
 | Ollama adapter | `tests/providers/test_ollama.py` vs fixture | PLANNED |
 | OpenRouter + OpenAI/Anthropic/Gemini w/ secret refs | `tests/providers/test_cloud_adapters.py` | PLANNED |
+| Settings-schema validation (namespaced common/provider.*, passthrough opt-in) | `tests/unit/test_settings_schema.py` | PASSING |
 | Settings schemas render in UI | `web` Playwright `models-settings.spec.ts` | PLANNED |
+| Uniform control-plane descriptor (identity/capabilities/state/settings/health/events) | `tests/unit/test_control_plane.py`, `tests/api/test_system.py::test_capabilities_lists_fake_provider` | PASSING |
+| Persisted provider config CRUD (secret refs, not raw values) | `tests/persistence/test_control_plane_repos.py`, `tests/api/test_control_plane.py` | PASSING |
+| Host registry CRUD + capability model | `tests/persistence/test_control_plane_repos.py`, `tests/api/test_control_plane.py` | PASSING |
 | Unknown provider fails gracefully | `tests/providers/test_registry.py::test_unknown_provider` | PLANNED |
 | Adapter contract (all) | `tests/providers/conformance/` shared suite | PLANNED |
 

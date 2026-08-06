@@ -16,6 +16,38 @@ class SecretRef(BaseModel):
     target: str
 
 
+class ProviderConfig(BaseModel):
+    """A configured language-provider instance (endpoint + secret reference).
+
+    Distinct from the in-memory adapter registry: this is the persisted
+    configuration an adapter is constructed from (SPEC/PROVIDER_MATRIX.md).
+    """
+
+    id: str
+    type: str
+    display_name: str
+    base_url: str | None = None
+    secret_ref_id: str | None = None
+    enabled: bool = True
+    settings: dict[str, Any] = Field(default_factory=dict)
+
+
+HostKind = Literal["ssh", "node", "local"]
+
+
+class Host(BaseModel):
+    id: str
+    display_name: str
+    kind: HostKind
+    hostname: str | None = None
+    port: int | None = None
+    username: str | None = None
+    secret_ref_id: str | None = None
+    workspace_roots: list[str] = Field(default_factory=list)
+    known_host_fingerprint: str | None = None
+    capabilities: list[str] = Field(default_factory=list)
+
+
 class Role(BaseModel):
     id: str
     name: str

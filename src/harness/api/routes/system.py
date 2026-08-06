@@ -8,6 +8,7 @@ from fastapi import APIRouter, Request
 
 from harness import __version__
 from harness.core.app import Application
+from harness.core.control_plane import ControlPlaneDescriptor
 
 router = APIRouter(tags=["system"])
 
@@ -28,15 +29,9 @@ async def system_info(request: Request) -> dict[str, Any]:
 
 
 @router.get("/capabilities")
-async def capabilities(request: Request) -> dict[str, Any]:
+async def capabilities(request: Request) -> dict[str, list[ControlPlaneDescriptor]]:
+    """Uniform control-plane descriptors for every registered subsystem resource."""
     app: Application = request.app.state.harness
     return {
-        "language_providers": [
-            {
-                "id": p.provider_id,
-                "display_name": p.display_name,
-                "levels": sorted(level.name for level in p.capabilities()),
-            }
-            for p in app.providers.list()
-        ]
+        "language_providers": [p.describe() for p in app.providers.list()],
     }

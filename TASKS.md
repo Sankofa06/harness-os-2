@@ -118,25 +118,25 @@ Task format: ID — title / description / deps / components / acceptance / tests
 - Desc: control-plane vocabulary (identity/capabilities/state/settings-schema/settings/actions/telemetry/history/health/events) as typed contracts adapters implement; unsupported capabilities explicit.
 - Deps: CORE-003. Components: core.
 - Acceptance: registry lists subsystem capabilities uniformly; `/capabilities` reflects it.
-- Tests: unit contract tests. Status: TODO
+- Tests: unit contract tests. Status: DONE
 
 ### CP-002 Settings-schema system
 - Desc: JSON-Schema-based settings descriptors with namespaced provider sections (`common` + `provider.<name>`); validation rejects unknown fields unless passthrough declared.
 - Deps: CP-001. Components: core.
 - Acceptance: schema round-trips to UI renderable form; unknown-field rejection works.
-- Tests: unit validation tests. Status: TODO
+- Tests: unit validation tests. Status: DONE
 
 ### CP-003 Provider registry
 - Desc: providers table + registration/config of language provider instances (endpoint, secret ref, enabled), `/language/providers`.
 - Deps: CP-002, SEC-001. Components: providers, api.
 - Acceptance: add/list/remove providers; secrets by reference only.
-- Tests: API integration. Status: TODO
+- Tests: API integration. Status: DONE
 
 ### CP-004 Host registry
 - Desc: hosts + host_capabilities tables, `/hosts` CRUD, capability model per SPEC/HOSTS_AND_NODE.md.
 - Deps: CP-001, SEC-001. Components: hosts, api.
 - Acceptance: hosts persist with capability sets; `/hosts/{id}/capabilities` works.
-- Tests: API integration. Status: TODO
+- Tests: API integration. Status: DONE
 
 ---
 

@@ -3,12 +3,11 @@
 _Last updated: 2026-08-06_
 
 ## Current milestone
-Phase 4 vertical slice complete and proven end-to-end. Milestone 1 (kernel) is fully
-done: kernel domain/persistence/events/API, SEC-001 (secrets), and JOB-001 (job
-engine) all implemented and tested. Moving into Milestone 2 (control plane).
+Milestone 1 (kernel) and Milestone 2 (control plane) are both fully done. Moving into
+Milestone 3 (language compute): real provider adapters beyond the fake one.
 
 ## Active task
-None in flight. Next up per `TASKS.md`: CP-001 (capability registry).
+None in flight. Next up per `TASKS.md`: LP-003 (generic OpenAI-compatible adapter).
 
 ## Completed milestones
 - Phase 1: full spec-kit reading pass (all `SPEC/`, `ADR/`, `BUILD/`, `TESTING/`,
@@ -40,9 +39,19 @@ None in flight. Next up per `TASKS.md`: CP-001 (capability registry).
       the real server, not just mocked component tests).
   14. The TUI displays the same conversation through the API only (Textual app using
       a plain HTTP client, no direct DB/runtime access).
+- Milestone 1 (kernel), completed beyond the vertical slice: SEC-001 secrets
+  abstraction (keyring/encrypted-file/env backends, `/secrets/*`) and JOB-001 job
+  engine (cancelable async jobs, persisted state machine, `job.*` events, `/jobs/*`).
+- Milestone 2 (control plane), fully done: CP-001 uniform control-plane descriptor
+  (`ControlPlaneDescriptor`/`describe()`, reflected in `/capabilities`); CP-002
+  JSON-Schema settings system (`SettingsSchema`/`validate_settings`, namespaced
+  `common`/`provider.<name>`, passthrough opt-in); CP-003 persisted language-provider
+  configuration (`/language/providers*`, distinct from the in-memory adapter
+  registry); CP-004 host registry (`/hosts*`, capability model from
+  SPEC/HOSTS_AND_NODE.md, `host_capabilities` table).
 
 ## Known failures
-None functionally. 76/76 backend tests pass, 1/1 web unit test passes, 1/1 Playwright
+None functionally. 100/100 backend tests pass, 1/1 web unit test passes, 1/1 Playwright
 e2e test passes. `ruff check`, `ruff format --check`, and `mypy --strict` are clean on
 `src/harness`. `eslint`, `vitest`, and `tsc -b && vite build` are clean on `web/`.
 Cosmetic: some test runs emit a `PytestUnhandledThreadExceptionWarning` from an
@@ -69,13 +78,15 @@ what's built so far:
 - D-014: license selection is deferred to the project owner (placeholder in place).
 
 ## What is NOT yet built
-Everything outside the vertical slice's exact 14 items: real (non-fake) language
-provider adapters, SSH hosts/workspaces, tools/permissions engine beyond the stub,
-MCP/skills, creative compute, analytics/benchmarks, the Node daemon, the rest of the
-WebUI (graph/compute/models/creative/assets/analytics/approvals views, full
-three-panel IA, context meter, accessibility audit), TUI feature completion, demo
-mode content, screenshot automation, GitHub Pages site, and marketing copy. These are
-tracked as their own `TASKS.md` entries and proceed in dependency order per
+Real (non-fake) language provider adapters (LM Studio/Ollama/OpenRouter/OpenAI/
+Anthropic/Gemini/generic OpenAI-compatible — only the deterministic fake adapter
+exists so far), SSH hosts/workspaces execution (host *records* exist via CP-004, but
+nothing yet connects to one), tools/permissions engine beyond the stub, MCP/skills,
+creative compute, analytics/benchmarks, the Node daemon, the rest of the WebUI
+(graph/compute/models/creative/assets/analytics/approvals views, full three-panel IA,
+context meter, accessibility audit), TUI feature completion, demo mode content,
+screenshot automation, GitHub Pages site, and marketing copy. These are tracked as
+their own `TASKS.md` entries and proceed in dependency order per
 `BUILD/IMPLEMENTATION_PLAN.md`.
 
 ## Exact commands to run the currently working application
@@ -105,7 +116,7 @@ HARNESS_DEMO_MODE=1 uv run harness serve
 
 Test suites:
 ```bash
-uv run pytest tests -q                      # backend: 60 tests
+uv run pytest tests -q                      # backend: 100 tests
 cd web && npm run test                      # web unit: vitest
 cd web && npx playwright test               # web e2e (needs both servers running)
 ```

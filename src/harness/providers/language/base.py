@@ -14,7 +14,9 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 from harness.core.capabilities import AdapterLevel
+from harness.core.control_plane import ControlPlaneDescriptor, ResourceHealth
 from harness.core.errors import UnsupportedCapabilityError
+from harness.core.settings_schema import SettingsSchema
 
 
 class ChatMessage(BaseModel):
@@ -75,8 +77,33 @@ class LanguageProvider(ABC):
             f"provider {self.provider_id} does not support model discovery"
         )
 
+    def settings_schema(self) -> SettingsSchema:
+        """Namespaced settings schema (CP-002). Base: no adapter-specific fields."""
+        return SettingsSchema(
+            common={
+                "type": "object",
+                "properties": {
+                    "temperature": {"type": "number", "minimum": 0, "maximum": 2},
+                    "max_output_tokens": {"type": "integer", "minimum": 1},
+                },
+            }
+        )
+
     def require(self, level: AdapterLevel) -> None:
         if level not in self.capabilities():
             raise UnsupportedCapabilityError(
                 f"provider {self.provider_id} does not support {level.name}"
             )
+
+    def describe(self) -> ControlPlaneDescriptor:
+        """Control-plane descriptor (SPEC/ARCHITECTURE.md vocabulary)."""
+        return ControlPlaneDescriptor(
+            id=self.provider_id,
+            type="language_provider",
+            display_name=self.display_name,
+            capabilities=sorted(level.name for level in self.capabilities()),
+            state="available",
+            settings_schema=self.settings_schema().to_dict(),
+            health=ResourceHealth.OK,
+            events=["inference.started", "inference.token", "inference.completed"],
+        )
