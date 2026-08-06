@@ -56,15 +56,26 @@ Format: decision / reason / alternatives / consequences.
 - Reason: specs must be versioned and referenceable from code/tests; the repo previously contained only the zip.
 - Consequences: root README.md describes the implementation and links to the kit docs.
 
-## D-014 — License selection deferred to project owner
-- Decision: ship a placeholder `LICENSE` file and `license = "LicenseRef-Pending"` in
-  `pyproject.toml` rather than choosing an open-source license unilaterally.
-- Reason: license choice (MIT/Apache-2.0/AGPL/proprietary/etc.) has legal and business
-  consequences for the project owner that a spec kit cannot answer on their behalf;
-  SPEC/DEFINITION_OF_DONE.md only requires the decision to be *documented*, not made.
-- Alternatives: default to MIT (common OSS default) or Apache-2.0.
-- Consequences: `REL-004`'s final audit should re-flag this until the owner picks a
-  license; MARKETING copy that references "open-source" should wait for that choice.
+## D-010 — Fake provider is a first-class adapter, not test-only code
+- Decision: the deterministic provider (LP-002) ships in `harness.providers.language.fake` as a real adapter used by demo mode (`HARNESS_DEMO_MODE=1`) and CI.
+- Reason: SPEC/UI_UX.md seeded screenshot mode requires deterministic fictional data with no network; DoD requires fixture-exercised adapters.
+- Consequences: demo mode and tests share one code path; it must meet the same adapter contract (conformance suite).
+
+## D-011 — Role carries a system prompt, not a binding
+- Decision: `Role` (core/domain.py) contributes `system_prompt` to the context compiler but no `provider`/`model`/host fields. The "role default" level in the 5-level binding precedence (SPEC/ARCHITECTURE.md) is therefore a defined no-op in v1: it participates in precedence order but never supplies a value, so resolution falls through to contact/system.
+- Reason: SPEC/CONTACTS_ROLES_PERSONAS.md's Role example shows only responsibility/permissions, never model/host defaults; CONFIG/examples/contact.example.yaml is where `binding` first appears. Adding an unused field speculatively would violate AGENTS.md's "no placeholders" rule.
+- Alternatives: give Role a `binding: Binding` field now.
+- Consequences: if a future requirement needs per-role default models, add the field then; `resolve_binding()` already accepts a `role` argument so the change is additive, not a rework.
+
+## D-012 — Vertical-slice WebUI client is hand-written, pending WEB-011 codegen
+- Decision: `web/src/api/client.ts` hand-declares types for only the endpoints the
+  vertical-slice chat view calls (health, contacts, sessions, messages).
+- Reason: SPEC/API_CONTRACT.md requires a TS client generated from `/openapi.json`
+  (WEB-011), but generating it needs the OpenAPI surface to stabilize past the kernel
+  slice; blocking the vertical-slice proof on codegen tooling would stall Phase 4.
+- Alternatives: wire up openapi-typescript now against the partial API.
+- Consequences: WEB-011 must delete this hand-written client and replace all call
+  sites with the generated one — tracked so it isn't mistaken for the final shape.
 
 ## D-013 — CORS enabled by default for the WebUI dev server origin only
 - Decision: `security.cors_origins` defaults to `http://localhost:5173` /
@@ -79,23 +90,34 @@ Format: decision / reason / alternatives / consequences.
 - Consequences: production/packaged builds that serve WebUI static assets from the API
   process should set `security.cors_origins: []`.
 
-## D-012 — Vertical-slice WebUI client is hand-written, pending WEB-011 codegen
-- Decision: `web/src/api/client.ts` hand-declares types for only the endpoints the
-  vertical-slice chat view calls (health, contacts, sessions, messages).
-- Reason: SPEC/API_CONTRACT.md requires a TS client generated from `/openapi.json`
-  (WEB-011), but generating it needs the OpenAPI surface to stabilize past the kernel
-  slice; blocking the vertical-slice proof on codegen tooling would stall Phase 4.
-- Alternatives: wire up openapi-typescript now against the partial API.
-- Consequences: WEB-011 must delete this hand-written client and replace all call
-  sites with the generated one — tracked so it isn't mistaken for the final shape.
+## D-014 — License selection deferred to project owner
+- Decision: ship a placeholder `LICENSE` file and `license = "LicenseRef-Pending"` in
+  `pyproject.toml` rather than choosing an open-source license unilaterally.
+- Reason: license choice (MIT/Apache-2.0/AGPL/proprietary/etc.) has legal and business
+  consequences for the project owner that a spec kit cannot answer on their behalf;
+  SPEC/DEFINITION_OF_DONE.md only requires the decision to be *documented*, not made.
+- Alternatives: default to MIT (common OSS default) or Apache-2.0.
+- Consequences: `REL-004`'s final audit should re-flag this until the owner picks a
+  license; MARKETING copy that references "open-source" should wait for that choice.
 
-## D-011 — Role carries a system prompt, not a binding
-- Decision: `Role` (core/domain.py) contributes `system_prompt` to the context compiler but no `provider`/`model`/host fields. The "role default" level in the 5-level binding precedence (SPEC/ARCHITECTURE.md) is therefore a defined no-op in v1: it participates in precedence order but never supplies a value, so resolution falls through to contact/system.
-- Reason: SPEC/CONTACTS_ROLES_PERSONAS.md's Role example shows only responsibility/permissions, never model/host defaults; CONFIG/examples/contact.example.yaml is where `binding` first appears. Adding an unused field speculatively would violate AGENTS.md's "no placeholders" rule.
-- Alternatives: give Role a `binding: Binding` field now.
-- Consequences: if a future requirement needs per-role default models, add the field then; `resolve_binding()` already accepts a `role` argument so the change is additive, not a rework.
-
-## D-010 — Fake provider is a first-class adapter, not test-only code
-- Decision: the deterministic provider (LP-002) ships in `harness.providers.language.fake` as a real adapter used by demo mode (`HARNESS_DEMO_MODE=1`) and CI.
-- Reason: SPEC/UI_UX.md seeded screenshot mode requires deterministic fictional data with no network; DoD requires fixture-exercised adapters.
-- Consequences: demo mode and tests share one code path; it must meet the same adapter contract (conformance suite).
+## D-015 — LM Studio adapter: native `/api/v1/models*` for lifecycle, OpenAI-compatible for chat
+- Decision: `LMStudioProvider` uses LM Studio's native v1 REST API only for
+  discovery/lifecycle (`GET /api/v1/models`, `POST /api/v1/models/load`,
+  `POST /api/v1/models/unload`, verified field names: `instance_id`, `model`,
+  `context_length`, `eval_batch_size`, `flash_attention`, `offload_kv_to_gpu`,
+  `echo_load_config`, `status`, `load_time_seconds`) and delegates chat entirely to
+  `OpenAICompatibleProvider` against LM Studio's `/v1/chat/completions`.
+- Reason: LM Studio's native chat surface (`/api/v1/chat`) is *stateful* — the server
+  stores conversation history server-side and returns a `response_id` for
+  continuation. Harness's `ChatRequest` contract is stateless (the Context Compiler
+  owns history, per SPEC/CONTEXT_COMPILER.md); adopting the stateful native chat
+  endpoint would duplicate state ownership between Harness and LM Studio. The
+  OpenAI-compatible endpoint matches our existing stateless contract exactly, and
+  SPEC/PROVIDER_MATRIX.md explicitly names it as the fallback path.
+- Verification: endpoint/field names confirmed via LM Studio's public developer docs
+  (lmstudio.ai/docs/developer/rest/*) as of this implementation date, not guessed;
+  `settings_schema()` only exposes the load-time fields the docs document, per
+  SPEC/PROVIDER_MATRIX.md's "do not hard-code settings the installed version doesn't
+  advertise."
+- Consequences: if a future LM Studio version changes these field names, only this
+  adapter needs updating — the contract (`LanguageProvider`) is unaffected.

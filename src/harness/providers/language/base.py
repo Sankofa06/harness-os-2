@@ -57,6 +57,15 @@ class ModelInfo(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+class ModelInstance(BaseModel):
+    """A running load of a model, returned by lifecycle operations (L3)."""
+
+    instance_id: str
+    model_id: str
+    status: str
+    load_time_seconds: float | None = None
+
+
 class LanguageProvider(ABC):
     """Base adapter. Subclasses set ``provider_id``/``display_name`` and capabilities."""
 
@@ -75,6 +84,18 @@ class LanguageProvider(ABC):
         """Model discovery (L2)."""
         raise UnsupportedCapabilityError(
             f"provider {self.provider_id} does not support model discovery"
+        )
+
+    async def load_model(self, model_id: str, **options: Any) -> ModelInstance:
+        """Load a model into memory (L3)."""
+        raise UnsupportedCapabilityError(
+            f"provider {self.provider_id} does not support model lifecycle control"
+        )
+
+    async def unload_model(self, instance_id: str) -> None:
+        """Unload a running model instance (L3)."""
+        raise UnsupportedCapabilityError(
+            f"provider {self.provider_id} does not support model lifecycle control"
         )
 
     def settings_schema(self) -> SettingsSchema:

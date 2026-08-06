@@ -158,13 +158,13 @@ Task format: ID — title / description / deps / components / acceptance / tests
 - Desc: base URL + API key + model list when available; streaming chat + tools (L1).
 - Deps: LP-001, CP-003. Components: providers.language.
 - Acceptance: works against fake OpenAI-compatible test server.
-- Tests: contract fixture tests. Status: TODO
+- Tests: contract fixture tests. Status: DONE
 
 ### LP-004 LM Studio native adapter (L5)
 - Desc: native v1 API: discovery/list/load/unload/settings from runtime schema, TTFT/throughput when exposed; OpenAI-compatible fallback; no hard-coded settings.
 - Deps: LP-003. Components: providers.language.
 - Acceptance: DoD Providers bullet 2 against fixture server.
-- Tests: fake LM Studio fixture tests. Status: TODO
+- Tests: fake LM Studio fixture tests. Status: DONE
 
 ### LP-005 Ollama adapter (L4/L5)
 - Desc: native API: list/show/pull progress/chat/generate/options/keep-alive/unload; embeddings metadata.

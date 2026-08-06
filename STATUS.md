@@ -3,11 +3,12 @@
 _Last updated: 2026-08-06_
 
 ## Current milestone
-Milestone 1 (kernel) and Milestone 2 (control plane) are both fully done. Moving into
-Milestone 3 (language compute): real provider adapters beyond the fake one.
+Milestones 1 (kernel) and 2 (control plane) are fully done. Milestone 3 (language
+compute) is in progress: generic OpenAI-compatible (LP-003) and LM Studio native
+(LP-004) adapters are done; Ollama/OpenRouter/OpenAI/Anthropic/Gemini remain.
 
 ## Active task
-None in flight. Next up per `TASKS.md`: LP-003 (generic OpenAI-compatible adapter).
+None in flight. Next up per `TASKS.md`: LP-005 (Ollama adapter).
 
 ## Completed milestones
 - Phase 1: full spec-kit reading pass (all `SPEC/`, `ADR/`, `BUILD/`, `TESTING/`,
@@ -51,7 +52,7 @@ None in flight. Next up per `TASKS.md`: LP-003 (generic OpenAI-compatible adapte
   SPEC/HOSTS_AND_NODE.md, `host_capabilities` table).
 
 ## Known failures
-None functionally. 100/100 backend tests pass, 1/1 web unit test passes, 1/1 Playwright
+None functionally. 108/108 backend tests pass, 1/1 web unit test passes, 1/1 Playwright
 e2e test passes. `ruff check`, `ruff format --check`, and `mypy --strict` are clean on
 `src/harness`. `eslint`, `vitest`, and `tsc -b && vite build` are clean on `web/`.
 Cosmetic: some test runs emit a `PytestUnhandledThreadExceptionWarning` from an
@@ -78,10 +79,12 @@ what's built so far:
 - D-014: license selection is deferred to the project owner (placeholder in place).
 
 ## What is NOT yet built
-Real (non-fake) language provider adapters (LM Studio/Ollama/OpenRouter/OpenAI/
-Anthropic/Gemini/generic OpenAI-compatible — only the deterministic fake adapter
-exists so far), SSH hosts/workspaces execution (host *records* exist via CP-004, but
-nothing yet connects to one), tools/permissions engine beyond the stub, MCP/skills,
+Real cloud/local provider adapters beyond OpenAI-compatible + LM Studio (Ollama,
+OpenRouter, OpenAI, Anthropic, Gemini), model profiles/placement policy and the
+instance lifecycle API (LP-008/LP-009) that would let the API actually load/unload
+models through these adapters, SSH hosts/workspaces execution (host *records* exist
+via CP-004, but nothing yet connects to one), tools/permissions engine beyond the
+stub, MCP/skills,
 creative compute, analytics/benchmarks, the Node daemon, the rest of the WebUI
 (graph/compute/models/creative/assets/analytics/approvals views, full three-panel IA,
 context meter, accessibility audit), TUI feature completion, demo mode content,
@@ -116,7 +119,7 @@ HARNESS_DEMO_MODE=1 uv run harness serve
 
 Test suites:
 ```bash
-uv run pytest tests -q                      # backend: 100 tests
+uv run pytest tests -q                      # backend: 108 tests
 cd web && npm run test                      # web unit: vitest
 cd web && npx playwright test               # web e2e (needs both servers running)
 ```
