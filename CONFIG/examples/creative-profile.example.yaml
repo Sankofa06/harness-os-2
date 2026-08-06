@@ -1,0 +1,13 @@
+name: app-icon
+description: Generate square app-icon concepts.
+selector:
+  capability: generation.text_to_image
+  preferred_engine: comfyui
+
+settings:
+  width: 1024
+  height: 1024
+
+placement:
+  prefer_loaded_asset: true
+  automatic: false

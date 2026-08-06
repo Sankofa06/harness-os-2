@@ -1,0 +1,18 @@
+handle: builder
+display_name: Builder
+role: coder
+personas:
+  - pragmatic
+  - test-first
+
+binding:
+  language_profile: local-coder
+  inference_host: auto
+  execution_host: auto
+
+permissions:
+  filesystem_read: allow
+  filesystem_write: ask
+  shell_exec: ask
+  network: ask
+  git_write: ask

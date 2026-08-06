@@ -1,0 +1,13 @@
+{
+  "name": "Harness OS Spec Kit",
+  "generated": "2026-08-06",
+  "purpose": "Spec-driven one-shot implementation",
+  "personal_data_included": false,
+  "primary_spec_files": [
+    "SPEC/PRODUCT.md",
+    "SPEC/ARCHITECTURE.md",
+    "SPEC/API_CONTRACT.md",
+    "SPEC/DEFINITION_OF_DONE.md",
+    "BUILD/ONE_SHOT_PROMPT.md"
+  ]
+}

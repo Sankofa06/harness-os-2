@@ -1,0 +1,23 @@
+server:
+  host: 127.0.0.1
+  port: 4096
+  auth: required
+
+context:
+  default_budget_tokens: 8192
+  bootstrap_target_tokens: 4096
+  full_capability_soft_limit_tokens: 16384
+  lazy_tools: true
+  lazy_skills: true
+  lazy_mcp: true
+
+routing:
+  automatic_placement: false
+  prefer_loaded_models: true
+
+security:
+  telemetry_export: false
+  remote_workspace_roots_required: true
+
+ui:
+  demo_mode: false
