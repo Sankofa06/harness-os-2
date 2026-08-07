@@ -30,6 +30,7 @@ async def test_migrate_creates_schema_and_is_idempotent() -> None:
         "skills",
         "skill_activations",
         "superpower_toggles",
+        "creative_installations",
     ):
         tables = await db.fetch_all(
             "SELECT name FROM sqlite_master WHERE type = 'table' AND name = :t", {"t": table}

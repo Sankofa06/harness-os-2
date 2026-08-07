@@ -86,8 +86,8 @@ names; file paths may evolve. Status: PLANNED / IMPLEMENTED / PASSING.
 | Workspace-scoped file/shell/git tools (TOOL-002) behind permission classes; injection resistance; traversal rejection | `tests/api/test_workspace_tools.py` vs real local SSH server | PASSING |
 
 ## Creative
-| SM installation discovery (Data layout) | `tests/creative/test_discovery.py` vs fixture tree | PLANNED |
-| Package catalog w/ type/platform | `tests/creative/test_catalog.py` | PLANNED |
+| SM installation discovery (Data layout: settings.json InstalledPackages); unknown packages → unknown/custom with detected metadata | `tests/creative/test_discovery.py` vs fixture settings.json; `tests/api/test_creative.py` vs real local SSH server | PASSING |
+| Installed package catalog shows package type/platform (family_id/family_group/platform_supported per installation) | `tests/creative/test_discovery.py`, `tests/api/test_creative.py` | PASSING |
 | ComfyUI submit + capture | `tests/creative/test_comfyui.py` vs fake server | PLANNED |
 | A1111-style capability negotiation | `tests/creative/test_a1111.py` | PLANNED |
 | Honest capability levels for other families | `tests/creative/test_capability_levels.py` | PLANNED |

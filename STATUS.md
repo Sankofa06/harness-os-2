@@ -3,11 +3,26 @@
 _Last updated: 2026-08-07_
 
 ## Current milestone
-Milestones 1 (kernel), 2 (control plane), 3 (language compute), 4 (execution),
-5 (agent runtime), and 6 (MCP + Skills — MCP-001, MCP-002, SKL-001, SKL-002)
-are all fully done — see the notes below for the MCP/Skills work. Next up is
-Milestone 7 (Creative compute), starting with CRE-001 (Stability Matrix
-discovery).
+Milestones 1-6 are all fully done (kernel, control plane, language compute,
+execution, agent runtime, MCP + Skills). Milestone 7 (Creative compute) is in
+progress: CRE-001 (Stability Matrix discovery) is done — see the note below.
+Next up is CRE-002 (Engine capability model).
+
+CRE-001: `harness.providers.creative.families`/`discovery` parses Stability
+Matrix's `<DataDir>/settings.json` (verified via source inspection — its
+*only* per-install metadata; there's no per-package folder file) into
+`DiscoveredInstallation`s, classifying each against a data-driven family
+catalog covering all 20 SPEC-required package families by case-insensitive
+name-pattern matching (only 5 families' exact `PackageName` strings were
+independently verifiable; the rest match by `DisplayName`, honestly
+documented as such). An unmatched package becomes `unknown/custom` with its
+full detected JSON preserved, never dropped or crashed on. `POST /creative/
+installations/scan` reads the file over SFTP via the same `SSHHost.
+read_file`/`workspace_roots` containment HOST-002 established — SSH-only for
+now, since no local/Node host adapter exists yet. Proven against a real
+local SSH server (not mocks) plus 14 fixture-driven unit/integration tests,
+including a regression test proving `stable-diffusion-webui-forge` doesn't
+misclassify as bare AUTOMATIC1111 despite the substring overlap. See D-044.
 
 SKL-002: `harness.skills.superpowers.BUNDLES` declares the seven seed
 bundles (Coding, Git/GitHub, Browser, Creative, Research, Remote Host,
@@ -225,9 +240,8 @@ from persisted Runs/ToolRuns on every request rather than a separately
 maintained structure, so it can't drift from what actually happened.
 
 ## Active task
-Milestone 6 (MCP + Skills) is fully done (see Current milestone above). Next
-per `TASKS.md` is CRE-001 (Stability Matrix discovery), starting Milestone 7
-(Creative compute).
+CRE-001 is done (see Current milestone above). Next per `TASKS.md` is CRE-002
+(Engine capability model).
 
 ## Completed milestones
 - Phase 1: full spec-kit reading pass (all `SPEC/`, `ADR/`, `BUILD/`, `TESTING/`,
@@ -285,7 +299,7 @@ asyncio interaction, not an application bug.
 None.
 
 ## Architectural decisions made during implementation
-See `DECISIONS.md` for the full list (D-001 through D-043). Notable ones affecting
+See `DECISIONS.md` for the full list (D-001 through D-044). Notable ones affecting
 what's built so far:
 - D-003/D-004: SQLAlchemy async + plain SQL migrations, schema grows incrementally
   per subsystem milestone rather than all at once.
@@ -300,12 +314,14 @@ what's built so far:
 - D-014: license selection is deferred to the project owner (placeholder in place).
 
 ## What is NOT yet built
-creative compute, analytics/benchmarks, the Node daemon, the rest of the
-WebUI (graph/compute/models/creative/assets/analytics/approvals views, full
-three-panel IA, context meter, accessibility audit), TUI feature completion,
-demo mode content, screenshot automation, GitHub Pages site, and marketing
-copy. These are tracked as their own `TASKS.md` entries and proceed in
-dependency order per `BUILD/IMPLEMENTATION_PLAN.md`.
+the rest of creative compute (engine capability model, ComfyUI/A1111 deep
+adapters, asset catalog, profiles, batch comparison, provenance),
+analytics/benchmarks, the Node daemon, the rest of the WebUI (graph/compute/
+models/creative/assets/analytics/approvals views, full three-panel IA,
+context meter, accessibility audit), TUI feature completion, demo mode
+content, screenshot automation, GitHub Pages site, and marketing copy. These
+are tracked as their own `TASKS.md` entries and proceed in dependency order
+per `BUILD/IMPLEMENTATION_PLAN.md`.
 
 ## Exact commands to run the currently working application
 
@@ -334,7 +350,7 @@ HARNESS_DEMO_MODE=1 uv run harness serve
 
 Test suites:
 ```bash
-uv run pytest tests -q                      # backend: 306 tests
+uv run pytest tests -q                      # backend: 320 tests
 cd web && npm run test                      # web unit: vitest
 cd web && npx playwright test               # web e2e (needs both servers running)
 ```

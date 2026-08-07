@@ -354,7 +354,7 @@ Task format: ID — title / description / deps / components / acceptance / tests
 - Desc: data-driven package catalog (all families in SPEC/CREATIVE_COMPUTE.md), Data-layout discovery of installations, unknown packages → `unknown/custom` with detected metadata.
 - Deps: CP-004. Components: providers.creative.
 - Acceptance: DoD Creative bullets 1–2 vs fixture layout.
-- Tests: discovery fixture tests. Status: TODO
+- Tests: discovery fixture tests. Status: DONE
 
 ### CRE-002 Engine capability model
 - Desc: per-engine supported_platforms/acceleration_backends/api_strategy/launch_strategy/asset_types/capability_set; integration hierarchy (native API → compat layer → HTTP adapter → launch/fs → read-only).

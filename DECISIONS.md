@@ -798,3 +798,41 @@ Format: decision / reason / alternatives / consequences.
   same-second calls to the same tool and actually observe; fixed by adding
   `, rowid DESC` as a tiebreaker, matching the pattern `MessageRepo` already
   used for the same reason.
+
+## D-044 — Stability Matrix discovery: verified via source inspection, name-pattern matching over a fixed `PackageName` enum, SSH-only for now
+- Decision: CRE-001's `harness.providers.creative.families`/`discovery`
+  reads Stability Matrix's `<DataDir>/settings.json` (its *only* per-install
+  metadata — there is no per-package folder file, confirmed by inspecting
+  the LykosAI/StabilityMatrix source, since no official schema doc exists).
+  Because only 5 of the 20 SPEC-required package families' exact
+  `PackageName` strings were independently verified (`ComfyUI`,
+  `stable-diffusion-webui`, `stable-diffusion-webui-forge`, `Fooocus`,
+  `InvokeAI`), the family catalog (`FAMILIES`) matches by case-insensitive
+  substring against `PackageName`+`DisplayName` combined, checked in a fixed
+  order (specific patterns like "reforge"/"amdgpu forge" before the generic
+  ones they're substrings of, e.g. "forge", "automatic1111") rather than an
+  exact-string enum — an unmatched package is classified `unknown/custom`
+  with its full detected JSON entry preserved (`raw_metadata`), never
+  dropped or crashed on, per SPEC's explicit data-driven-discovery
+  requirement. `platform_supported` is computed against a caller-supplied
+  `platform` (the scanned host's OS) rather than auto-detected, since
+  Harness has no host-OS-detection mechanism yet and `settings.json` itself
+  doesn't record it. `POST /creative/installations/scan` reads the file via
+  the same `SSHHost.read_file` + `workspace_roots` containment HOST-002
+  already established — there is no local/"node"-kind host adapter yet
+  (`HostKind` declares `"local"` but nothing implements it), so scanning is
+  SSH-only for now, a real declared limitation rather than a stub.
+- Reason: guessing at unverified `PackageName` strings for 15 of the 20
+  required families would have violated this project's "verify, don't
+  guess" bar for external protocol/format details; substring-matching
+  against the human-readable `DisplayName` Stability Matrix already shows
+  the operator is both honest about what's actually confirmed and robust in
+  practice (an operator recognizes their installation by its display name,
+  not an internal identifier).
+- Consequences: a family whose real `PackageName`/`DisplayName` doesn't
+  contain any of its declared patterns (e.g. a heavily renamed fork) will
+  misclassify as `unknown/custom` rather than crash — the safe failure mode
+  SPEC calls for. Revisit the 15 unverified families' patterns against a
+  real Stability Matrix installation or updated source once available.
+  Local-host and Node-adapter scanning are follow-on work, not silently
+  promised here.

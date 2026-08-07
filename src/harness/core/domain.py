@@ -436,6 +436,34 @@ class SessionActivatedCapability(BaseModel):
     created_at: str = ""
 
 
+class CreativeInstallation(BaseModel):
+    """One package Stability Matrix has installed, discovered by scanning a
+    Host's Stability Matrix Data directory (CRE-001, SPEC/CREATIVE_COMPUTE.md).
+    ``family_id`` is ``"unknown"`` when the package matched no known family in
+    `harness.providers.creative.families` — still recorded with its detected
+    metadata (`raw_metadata`) rather than dropped, per SPEC's data-driven
+    discovery requirement. ``platform_supported`` reflects whether the family
+    is declared compatible with the `platform` the scan was run against.
+    """
+
+    id: str
+    host_id: str
+    data_dir: str
+    package_name: str
+    display_name: str
+    library_path: str = ""
+    launch_command: str | None = None
+    python_version: str | None = None
+    family_id: str = "unknown"
+    family_display_name: str = "Unknown/Custom"
+    family_group: str = "unknown"
+    platform: str
+    supported_platforms: list[str] = Field(default_factory=list)
+    platform_supported: bool = False
+    raw_metadata: dict[str, Any] = Field(default_factory=dict)
+    created_at: str = ""
+
+
 class RunMetrics(BaseModel):
     run_id: str
     input_tokens: int | None = None
