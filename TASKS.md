@@ -240,7 +240,7 @@ Task format: ID — title / description / deps / components / acceptance / tests
 - Desc: artifacts table, typed catalog, disk store for blobs, `/artifacts*` incl. content + checksummed transfer, `artifact://` references.
 - Deps: DB-002, HOST-001. Components: artifacts, api.
 - Acceptance: artifacts referenced by ID; content lazy; transfers evented.
-- Tests: unit + API integration. Status: TODO
+- Tests: unit + API integration. Status: DONE
 
 ---
 

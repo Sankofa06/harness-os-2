@@ -14,6 +14,7 @@ from pathlib import Path
 from secrets import token_urlsafe
 
 from harness.agents.seeds import seed_agents
+from harness.artifacts.store import ArtifactBlobStore
 from harness.context.compiler import ContextCompiler
 from harness.context.tokens import HeuristicEstimator
 from harness.core.config import HarnessConfig
@@ -35,6 +36,7 @@ from harness.persistence.repos import (
     SessionRepo,
     TeamRepo,
 )
+from harness.persistence.repos_artifacts import ArtifactRepo
 from harness.persistence.repos_control_plane import HostRepo, ModelProfileRepo, ProviderConfigRepo
 from harness.persistence.repos_jobs import JobRepo
 from harness.persistence.repos_model_instances import ModelInstanceRepo
@@ -85,6 +87,8 @@ class Application:
     permission_policies: PermissionPolicyRepo
     permission_decisions: PermissionDecisionRepo
     permission_engine: PermissionEngine
+    artifacts: ArtifactRepo
+    artifact_blobs: ArtifactBlobStore
     compiler: ContextCompiler
     api_token: str
     system_binding: Binding = field(default_factory=lambda: SYSTEM_DEFAULT_BINDING)
@@ -178,6 +182,9 @@ async def create_application(config: HarnessConfig | None = None) -> Application
     tool_runs = ToolRunRepo(db)
     tool_executor = ToolExecutor(tools, tool_runs, bus, permission_engine)
 
+    artifacts = ArtifactRepo(db)
+    artifact_blobs = ArtifactBlobStore(config.data_dir / "artifacts")
+
     compiler = ContextCompiler(HeuristicEstimator(), config.context)
 
     return Application(
@@ -208,6 +215,8 @@ async def create_application(config: HarnessConfig | None = None) -> Application
         permission_policies=permission_policies,
         permission_decisions=permission_decisions,
         permission_engine=permission_engine,
+        artifacts=artifacts,
+        artifact_blobs=artifact_blobs,
         compiler=compiler,
         api_token=token,
     )

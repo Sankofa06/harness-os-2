@@ -80,8 +80,27 @@ tool layer (the Job succeeds — it's the *ToolRun* that fails, per D-029's spli
 and a `shell_exec` call genuinely blocking on its default `ask` policy until
 approved.
 
+ART-001 (Artifacts) is also done — this completes Milestone 4 (Execution) in full.
+An `artifacts` table holds typed metadata only (twelve types from
+SPEC/WORKSPACES_ARTIFACTS.md: code_file/image/video/screenshot/document/diff/
+patch/log/test_report/plan/benchmark_report/arbitrary_file); actual bytes live in
+a content-addressed disk blob store (`ArtifactBlobStore`, keyed by sha256, so
+identical content is stored once no matter how many Artifacts reference it).
+`GET /artifacts/{id}` never returns content — only `GET /artifacts/{id}/content`
+does — so referencing `artifact://<id>` in agent context never implicitly pulls
+bytes. `POST /artifacts` accepts inline base64 content (browser/client upload);
+`POST /workspaces/{id}/artifacts/pull` and `POST /artifacts/{id}/push` move bytes
+between the blob store and a Workspace's Host, reusing the same
+`harness.workspaces.service` containment and SSH plumbing WSP-001/002 and TOOL-002
+already share, and emit `artifact.created`/`artifact.transferred` events. Proven
+against a real local SSH server, including a full push-then-pull round trip and a
+path-traversal rejection on pull.
+
 ## Active task
-None in flight. Next up per `TASKS.md`: ART-001 (Artifacts).
+None in flight. Milestone 4 (Execution) is fully done. Remaining Milestone 5 work
+(all now unblocked): CTX-003 (transcript management), CTX-004 (context regression
+tests in CI), AGT-006 (delegation/orchestration graph, needs TOOL-001 — now done),
+AGT-007 (stop/cancel). Next up per `TASKS.md` order: CTX-003.
 
 ## Completed milestones
 - Phase 1: full spec-kit reading pass (all `SPEC/`, `ADR/`, `BUILD/`, `TESTING/`,
@@ -125,7 +144,7 @@ None in flight. Next up per `TASKS.md`: ART-001 (Artifacts).
   SPEC/HOSTS_AND_NODE.md, `host_capabilities` table).
 
 ## Known failures
-None functionally. 221/221 backend tests pass (repeatedly and reliably — see D-030
+None functionally. 236/236 backend tests pass (repeatedly and reliably — see D-030
 for a concurrency race that used to make some flaky before its fix), 2/2 web
 unit tests pass, 1/1 Playwright e2e test passes. `ruff check`, `ruff format --check`,
 and `mypy --strict` are clean on `src/harness`. `eslint`, `vitest`, and `tsc -b &&
@@ -139,7 +158,7 @@ asyncio interaction, not an application bug.
 None.
 
 ## Architectural decisions made during implementation
-See `DECISIONS.md` for the full list (D-001 through D-032). Notable ones affecting
+See `DECISIONS.md` for the full list (D-001 through D-034). Notable ones affecting
 what's built so far:
 - D-003/D-004: SQLAlchemy async + plain SQL migrations, schema grows incrementally
   per subsystem milestone rather than all at once.
@@ -154,7 +173,8 @@ what's built so far:
 - D-014: license selection is deferred to the project owner (placeholder in place).
 
 ## What is NOT yet built
-Artifacts (ART-001), MCP/skills, creative compute,
+CTX-003/004 (transcript management, context regression CI), AGT-006/007
+(delegation/orchestration graph, stop/cancel), MCP/skills, creative compute,
 analytics/benchmarks, the Node daemon, the rest of the WebUI (graph/compute/models/
 creative/assets/analytics/approvals views, full three-panel IA, context meter,
 accessibility audit), TUI feature completion, demo mode content, screenshot
@@ -188,7 +208,7 @@ HARNESS_DEMO_MODE=1 uv run harness serve
 
 Test suites:
 ```bash
-uv run pytest tests -q                      # backend: 221 tests
+uv run pytest tests -q                      # backend: 236 tests
 cd web && npm run test                      # web unit: vitest
 cd web && npx playwright test               # web e2e (needs both servers running)
 ```

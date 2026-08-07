@@ -15,6 +15,7 @@ from fastapi.responses import JSONResponse
 
 from harness.api.routes import (
     agents,
+    artifacts,
     events,
     hosts,
     instances,
@@ -96,5 +97,6 @@ def create_app(
     app.include_router(workspaces.router, prefix=API_PREFIX)
     app.include_router(tools.router, prefix=API_PREFIX)
     app.include_router(permissions.router, prefix=API_PREFIX)
+    app.include_router(artifacts.router, prefix=API_PREFIX)
 
     return app

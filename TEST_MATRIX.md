@@ -55,6 +55,11 @@ names; file paths may evolve. Status: PLANNED / IMPLEMENTED / PASSING.
 | Path traversal rejected (lexical `..`, prefix-sibling, relative, no-roots-fail-closed) | `tests/security/test_path_safety.py` | PASSING |
 | Symlink inside an allowed root resolving outside it is rejected | `tests/hosts/test_ssh.py::test_read_file_via_symlink_escaping_root_rejected`, `tests/security/test_path_safety.py::test_resolve_and_check_rejects_symlink_resolving_outside_root` | PASSING |
 
+## Artifacts
+| Typed catalog; content-addressed blob store; content lazy (metadata vs `/content`) | `tests/unit/test_artifact_store.py`, `tests/api/test_artifacts.py` | PASSING |
+| Transfers checksummed (sha256) and evented (`artifact.created`/`artifact.transferred`) | `tests/api/test_artifacts.py::test_pull_artifact_from_workspace_host`, `::test_push_artifact_to_workspace_host` vs real local SSH server | PASSING |
+| Push/pull path containment matches Workspace rules | `tests/api/test_artifacts.py::test_pull_artifact_rejects_path_outside_workspace` | PASSING |
+
 ## Node
 | Registers + authenticates (pairing) | `tests/node/test_pairing.py` | PLANNED |
 | CPU/RAM/disk telemetry | `tests/node/test_telemetry.py` | PLANNED |

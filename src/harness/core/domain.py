@@ -270,6 +270,48 @@ class PermissionDecisionLog(BaseModel):
     created_at: str = ""
 
 
+ArtifactType = Literal[
+    "code_file",
+    "image",
+    "video",
+    "screenshot",
+    "document",
+    "diff",
+    "patch",
+    "log",
+    "test_report",
+    "plan",
+    "benchmark_report",
+    "arbitrary_file",
+]
+
+
+class Artifact(BaseModel):
+    """Typed first-class content reference (ART-001, SPEC/WORKSPACES_ARTIFACTS.md).
+
+    Agents reference an artifact as ``artifact://<id>``; only this metadata record
+    is loaded by default, and full content is fetched separately (`GET /artifacts/
+    {id}/content`) so referencing an artifact never implicitly pulls its bytes into
+    context. Content itself lives in a content-addressed blob store keyed by
+    ``sha256`` (`harness.artifacts.store.ArtifactBlobStore`), so two artifacts with
+    identical bytes — e.g. the same screenshot referenced from two runs — share one
+    file on disk.
+    """
+
+    id: str
+    type: ArtifactType
+    mime_type: str
+    display_name: str
+    size: int
+    sha256: str
+    run_id: str | None = None
+    session_id: str | None = None
+    workspace_id: str | None = None
+    source_path: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    created_at: str = ""
+
+
 class RunMetrics(BaseModel):
     run_id: str
     input_tokens: int | None = None

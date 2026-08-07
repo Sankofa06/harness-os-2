@@ -485,3 +485,52 @@ Format: decision / reason / alternatives / consequences.
   workspace-scoped caller (a WebUI file-browser endpoint, a future MCP bridge)
   should import `harness.workspaces.service` rather than reimplementing
   containment a third time.
+
+## D-033 — Artifact content is content-addressed and always fetched separately from metadata
+- Decision: `Artifact` (ART-001) stores only metadata — type, mime_type,
+  display_name, size, sha256, provenance (run_id/session_id/workspace_id/
+  source_path), free-form metadata — never the bytes. Bytes live in
+  `ArtifactBlobStore`, a plain disk store keyed by `sha256(content)`, so two
+  Artifacts with identical bytes (the same screenshot pulled twice, or uploaded by
+  two different clients) share one file and `put()` is a no-op the second time.
+  `GET /artifacts/{id}` returns the metadata record; only `GET /artifacts/{id}/
+  content` returns bytes, as a raw `Response` with `media_type` set from the
+  Artifact's `mime_type`, not JSON-wrapped.
+- Reason: SPEC/WORKSPACES_ARTIFACTS.md is explicit that "Agents reference
+  `artifact://<id>`; full contents are loaded only when requested" — the same
+  "lazy by default" principle already applied to context (tool/MCP/skill bodies,
+  Milestone 1) and to the tool lifecycle. Content-addressing gets deduplication for
+  free without needing a separate reference-counting or garbage-collection pass for
+  this MVP; `ArtifactBlobStore` uses the same sync-file-I/O pattern
+  `SecretStore.EncryptedFileBackend` already established, since artifact content
+  (like secrets) is read/written whole, not streamed.
+- Consequences: `DELETE /artifacts/{id}` removes only the catalog row, not the
+  blob file — a shared blob referenced by another Artifact must not disappear out
+  from under it, and this MVP has no reference counting to know when the last
+  referencing Artifact is gone. A future cleanup pass (sweeping blobs with no
+  surviving `artifacts.sha256` reference) is a known, deferred gap, not an
+  oversight.
+
+## D-034 — Artifact transfers (pull/push) reuse WSP-001/002's Workspace plumbing, not a new path
+- Decision: `POST /workspaces/{id}/artifacts/pull` and `POST /artifacts/{id}/push`
+  both resolve their target path through `harness.workspaces.service.
+  resolve_within_workspace` and connect via `ssh_host_for_workspace` — the exact
+  same functions the HTTP workspace routes and TOOL-002's native tools already use
+  (D-032). Both emit an event (`artifact.created` for pull, `artifact.transferred`
+  for push) carrying the artifact's `sha256`/`size`, satisfying SPEC/
+  WORKSPACES_ARTIFACTS.md's "Transfers are checksummed and evented" — the sha256
+  Harness already computed when storing the blob doubles as the transfer's
+  checksum, since it's the same bytes.
+- Reason: SPEC/WORKSPACES_ARTIFACTS.md lists four transfer directions (remote host
+  <-> Harness, creative host -> workspace, browser/client -> workspace); building
+  a third path-resolution implementation for artifacts would have been the same
+  mistake D-032 just fixed for tools. "browser/client -> workspace" doesn't need
+  its own endpoint at all: a client uploads via the plain `POST /artifacts` (which
+  already exists for inline content) and then calls the same `push` used for
+  "Harness -> remote host" — one primitive covers both SPEC-listed directions.
+  "creative host -> workspace" is deferred until creative compute (Milestone 7,
+  not started) exists to produce Artifacts in the first place; it will create them
+  the same way `pull` does and reuse `push` unchanged.
+- Consequences: any future Artifact source (a creative-compute adapter, a browser
+  direct-to-workspace flow) should produce an `Artifact` via the existing creation
+  path and use `push`/`pull` rather than inventing a new transfer primitive.
