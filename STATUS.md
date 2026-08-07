@@ -39,7 +39,7 @@ pattern as LP-009's model load/unload) so a slow tool is cancelable like any oth
 long action. Permission resolution goes through a `PermissionResolver` Protocol;
 the only implementation so far is `AllowAllResolver` — an explicit stand-in, not a
 fake permission system — so "ask"/"deny" are real, tested code paths
-(`pending_approval`/`denied` ToolRun states, `tool.denied`/`tool.pending_approval`
+(`pending_approval`/`denied` ToolRun states, `tool.denied`/`tool.approval_required`
 events) with no caller able to produce them yet. PERM-001 will supply the real
 resolver. One built-in tool (`echo`, permission class `read`) is always registered,
 mirroring `FakeProvider`'s role for language providers — a real, safe, zero-config

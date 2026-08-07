@@ -363,7 +363,7 @@ Format: decision / reason / alternatives / consequences.
   implementation that exists yet, `AllowAllResolver`, always returns `"allow"`.
   `Application` wires it in `create_application()`. The lifecycle's branching on
   all three outcomes (`deny` -> `ToolRun.status="denied"` + `tool.denied`; `ask` ->
-  `status="pending_approval"` + `tool.pending_approval`; `allow` -> execute) is
+  `status="pending_approval"` + `tool.approval_required`; `allow` -> execute) is
   fully implemented and unit-tested with a fake resolver
   (`tests/unit/test_tool_lifecycle.py`), even though nothing in the running system
   can currently produce `ask`/`deny` outcomes.

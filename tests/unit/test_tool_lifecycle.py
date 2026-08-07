@@ -53,19 +53,47 @@ async def test_allowed_tool_executes_and_persists_result(db, registry: ToolRegis
 
 
 @pytest.mark.asyncio
-async def test_denied_permission_skips_execution(db, registry: ToolRegistry) -> None:
-    executor = ToolExecutor(registry, ToolRunRepo(db), EventBus(), _FixedResolver("deny"))
+async def test_denied_permission_skips_execution_and_emits_tool_denied(
+    db, registry: ToolRegistry
+) -> None:
+    import asyncio
+
+    bus = EventBus()
+    received: list[str] = []
+    subscription = bus.subscribe(None)
+    drain_task = asyncio.create_task(_drain(subscription, received))
+
+    executor = ToolExecutor(registry, ToolRunRepo(db), bus, _FixedResolver("deny"))
     run = await executor.execute("add_one", {"value": 41})
+    await asyncio.sleep(0.05)
+    drain_task.cancel()
+    subscription.close()
+
     assert run.status == "denied"
     assert run.result is None
+    assert received == ["tool.requested", "tool.denied"]
 
 
 @pytest.mark.asyncio
-async def test_ask_permission_leaves_run_pending_approval(db, registry: ToolRegistry) -> None:
-    executor = ToolExecutor(registry, ToolRunRepo(db), EventBus(), _FixedResolver("ask"))
+async def test_ask_permission_leaves_run_pending_approval_and_emits_approval_required(
+    db, registry: ToolRegistry
+) -> None:
+    import asyncio
+
+    bus = EventBus()
+    received: list[str] = []
+    subscription = bus.subscribe(None)
+    drain_task = asyncio.create_task(_drain(subscription, received))
+
+    executor = ToolExecutor(registry, ToolRunRepo(db), bus, _FixedResolver("ask"))
     run = await executor.execute("add_one", {"value": 41})
+    await asyncio.sleep(0.05)
+    drain_task.cancel()
+    subscription.close()
+
     assert run.status == "pending_approval"
     assert run.result is None
+    assert received == ["tool.requested", "tool.approval_required"]
 
 
 @pytest.mark.asyncio
@@ -115,7 +143,7 @@ async def test_events_emitted_match_lifecycle_outcome(db, registry: ToolRegistry
 
     drain_task.cancel()
     subscription.close()
-    assert received == ["tool.requested", "tool.started", "tool.succeeded"]
+    assert received == ["tool.requested", "tool.started", "tool.completed"]
 
 
 async def _drain(subscription: Any, out: list[str]) -> None:

@@ -74,7 +74,10 @@ class ToolExecutor:
             return run
         if decision == "ask":
             run = await self._runs.set_status(run.id, "pending_approval")
-            await self._emit(run, "tool.pending_approval", {})
+            # Event name matches SPEC/ARCHITECTURE.md's representative taxonomy
+            # ("tool.approval_required"), even though the persisted ToolRun status
+            # is the more descriptive "pending_approval".
+            await self._emit(run, "tool.approval_required", {})
             return run
 
         run = await self._runs.set_status(run.id, "running")
@@ -87,7 +90,8 @@ class ToolExecutor:
             return run
 
         run = await self._runs.set_status(run.id, "succeeded", result=result)
-        await self._emit(run, "tool.succeeded", {"result": result})
+        # "tool.completed" matches SPEC/ARCHITECTURE.md's representative taxonomy.
+        await self._emit(run, "tool.completed", {"result": result})
         return run
 
     async def _emit(self, run: ToolRun, event_type: str, payload: dict[str, Any]) -> None:

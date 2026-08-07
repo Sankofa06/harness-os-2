@@ -48,7 +48,7 @@ async def test_run_echo_tool_via_job_records_tool_run_and_events(client, harness
 
     events = await harness_app.events.replay(0)
     event_types = [e.type for e in events if e.context.get("tool_run_id") == tool_run_id]
-    assert event_types == ["tool.requested", "tool.started", "tool.succeeded"]
+    assert event_types == ["tool.requested", "tool.started", "tool.completed"]
 
 
 @pytest.mark.asyncio
