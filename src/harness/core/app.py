@@ -49,6 +49,7 @@ from harness.tools.builtin import echo_tool
 from harness.tools.lifecycle import ToolExecutor
 from harness.tools.permission_engine import PermissionEngine
 from harness.tools.registry import ToolRegistry
+from harness.tools.workspace_tools import register_workspace_tools
 
 # System-default binding when no contact/role override applies. The fake provider is
 # always registered so the server is usable with zero external configuration.
@@ -173,6 +174,7 @@ async def create_application(config: HarnessConfig | None = None) -> Application
 
     tools = ToolRegistry()
     tools.register(echo_tool())
+    register_workspace_tools(tools, workspaces, hosts, secret_refs, secret_store)
     tool_runs = ToolRunRepo(db)
     tool_executor = ToolExecutor(tools, tool_runs, bus, permission_engine)
 

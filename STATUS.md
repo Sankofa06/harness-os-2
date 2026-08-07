@@ -60,9 +60,28 @@ and PERM-001 was the first feature to create that kind of sustained overlap (a
 backgrounded Job racing live HTTP polling) — `Database` now serializes every
 query/execute through an `asyncio.Lock`.
 
+TOOL-002 (file/shell/git tools) is also done: `harness.tools.workspace_tools`
+registers twelve workspace-scoped native tools (`fs_read_file`/`fs_write_file`/
+`fs_list_dir`/`shell_exec`/`git_init`/`git_status`/`git_diff`/`git_add`/
+`git_commit`/`git_branch_list`/`git_branch_create`/`git_log`) through the same
+TOOL-001 lifecycle and PERM-001 permission engine the `echo` tool uses. Filesystem
+reads are permission class `read` (allow by default); writes `write` and shell
+exec `execute` (both ask by default); every git operation — including read-only
+status/diff/log — is `git`, its own dedicated class (SPEC/SECURITY_PRIVACY.md's
+taxonomy treats git as one bucket, not a read/write split). Path resolution and git
+invocation are shared with the WSP-001/002 HTTP routes via a new `harness.
+workspaces.service` module (extracted during this task so the HTTP layer and the
+native-tool layer can't subtly diverge on path containment) — `api/routes/
+workspaces.py` was refactored to use it too, with its existing 15 tests as the
+regression check that the refactor changed nothing observable. Proven against a
+real local SSH server: a full git workflow end-to-end through the tools (not the
+HTTP routes), shell argv-injection resistance, path-traversal rejection at the
+tool layer (the Job succeeds — it's the *ToolRun* that fails, per D-029's split),
+and a `shell_exec` call genuinely blocking on its default `ask` policy until
+approved.
+
 ## Active task
-None in flight. Next up per `TASKS.md`: TOOL-002 (file/shell/git tools, now that
-both TOOL-001 and PERM-001 are done).
+None in flight. Next up per `TASKS.md`: ART-001 (Artifacts).
 
 ## Completed milestones
 - Phase 1: full spec-kit reading pass (all `SPEC/`, `ADR/`, `BUILD/`, `TESTING/`,
@@ -106,8 +125,8 @@ both TOOL-001 and PERM-001 are done).
   SPEC/HOSTS_AND_NODE.md, `host_capabilities` table).
 
 ## Known failures
-None functionally. 211/211 backend tests pass (repeatedly and reliably — see D-030
-for a concurrency race that used to make two of them flaky before its fix), 2/2 web
+None functionally. 221/221 backend tests pass (repeatedly and reliably — see D-030
+for a concurrency race that used to make some flaky before its fix), 2/2 web
 unit tests pass, 1/1 Playwright e2e test passes. `ruff check`, `ruff format --check`,
 and `mypy --strict` are clean on `src/harness`. `eslint`, `vitest`, and `tsc -b &&
 vite build` are clean on `web/`.
@@ -120,7 +139,7 @@ asyncio interaction, not an application bug.
 None.
 
 ## Architectural decisions made during implementation
-See `DECISIONS.md` for the full list (D-001 through D-030). Notable ones affecting
+See `DECISIONS.md` for the full list (D-001 through D-032). Notable ones affecting
 what's built so far:
 - D-003/D-004: SQLAlchemy async + plain SQL migrations, schema grows incrementally
   per subsystem milestone rather than all at once.
@@ -135,8 +154,6 @@ what's built so far:
 - D-014: license selection is deferred to the project owner (placeholder in place).
 
 ## What is NOT yet built
-TOOL-002's file/shell/git tools (the registry, lifecycle, and now a real permission
-engine they'll run through all exist — TOOL-002 is registering the actual tools),
 Artifacts (ART-001), MCP/skills, creative compute,
 analytics/benchmarks, the Node daemon, the rest of the WebUI (graph/compute/models/
 creative/assets/analytics/approvals views, full three-panel IA, context meter,
@@ -171,7 +188,7 @@ HARNESS_DEMO_MODE=1 uv run harness serve
 
 Test suites:
 ```bash
-uv run pytest tests -q                      # backend: 211 tests
+uv run pytest tests -q                      # backend: 221 tests
 cd web && npm run test                      # web unit: vitest
 cd web && npx playwright test               # web e2e (needs both servers running)
 ```

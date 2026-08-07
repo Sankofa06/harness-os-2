@@ -440,3 +440,48 @@ Format: decision / reason / alternatives / consequences.
   — was removed rather than also lock-wrapped, since a caller using it directly
   would bypass the lock and reintroduce the race; multi-statement callers should use
   `execute()`/`fetch_all()` instead.
+
+## D-031 — Workspace-scoped tools take `workspace_id` inside `arguments`, not out of band
+- Decision: TOOL-002's twelve tools (`harness.tools.workspace_tools`) all require
+  `workspace_id` as a JSON-Schema property of the tool's own `arguments`, resolved
+  inside each handler via `workspaces.get(arguments["workspace_id"])`. `POST /tools/
+  {name}/run`'s separate top-level `workspace_id` field (used for indexing the
+  `ToolRun`) now falls back to `arguments.get("workspace_id")` when not explicitly
+  given, so a caller doesn't have to repeat it in two places.
+- Reason: `ToolHandler` (TOOL-001, `harness.tools.base`) is `Callable[[dict[str,
+  Any]], Awaitable[dict[str, Any]]]` — it only ever receives the schema-validated
+  arguments dict, not `Application` or any other out-of-band context. Changing that
+  signature to also inject workspace/host context would couple the generic tool
+  lifecycle to one specific tool family's needs; keeping `workspace_id` a normal,
+  schema-validated argument keeps `ToolExecutor` fully generic and makes a
+  workspace-scoped tool's contract self-documenting in its own JSON Schema (a
+  caller — or a model — introspecting `/tools` sees `workspace_id` listed as
+  `required` right alongside `path`/`argv`/`message`, not as an implicit
+  side-channel).
+- Consequences: any future tool family needing similar "which resource does this
+  act on" context should follow the same pattern (an ID field in its own schema),
+  not push for a second lifecycle-level context parameter.
+
+## D-032 — Workspace path/git logic extracted into `harness.workspaces.service`
+- Decision: `resolve_within_workspace`, `run_git`, `is_git_repo`, and
+  `ssh_host_for_workspace`/`ssh_host_for_host_id` moved out of `api/routes/
+  workspaces.py` (where WSP-001/002 first implemented them, as private
+  underscore-prefixed functions) into `harness/workspaces/service.py`, a plain
+  module with no FastAPI dependency. Both the HTTP routes and TOOL-002's native
+  tools now import from there.
+- Reason: TOOL-002 needed the exact same path-containment and git-invocation logic
+  the HTTP workspace endpoints already had. Path safety is precisely the kind of
+  logic that must not exist as two independently-maintained copies — a fix or
+  tightening applied to one copy and missed in the other is a real vulnerability
+  class, not just duplication. Extracting a shared, framework-free service module
+  once a second real caller existed (rather than speculatively up front during
+  WSP-001) follows the same "don't build for hypothetical future callers" principle
+  this codebase applies elsewhere, while still avoiding the actual duplication once
+  the second caller was concrete.
+- Consequences: the refactor changed no observable behavior — WSP-001/002's
+  existing 15 tests (`tests/api/test_workspaces.py`, `tests/api/
+  test_workspaces_git.py`, `tests/api/test_host_ssh.py`) all pass unmodified
+  against the refactored routes, serving as the regression check. Any future
+  workspace-scoped caller (a WebUI file-browser endpoint, a future MCP bridge)
+  should import `harness.workspaces.service` rather than reimplementing
+  containment a third time.

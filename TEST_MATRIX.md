@@ -73,6 +73,7 @@ names; file paths may evolve. Status: PLANNED / IMPLEMENTED / PASSING.
 | Skill metadata w/o body load | `tests/skills/test_lazy_skills.py` | PLANNED |
 | Superpower toggles | `tests/skills/test_superpowers.py` | PLANNED |
 | Permission ask/allow/deny; ask flow blocks until approval; decisions logged | `tests/api/test_permissions.py` | PASSING |
+| Workspace-scoped file/shell/git tools (TOOL-002) behind permission classes; injection resistance; traversal rejection | `tests/api/test_workspace_tools.py` vs real local SSH server | PASSING |
 
 ## Creative
 | SM installation discovery (Data layout) | `tests/creative/test_discovery.py` vs fixture tree | PLANNED |

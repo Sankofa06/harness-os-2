@@ -60,11 +60,16 @@ async def run_tool(request: Request, tool_name: str, body: ToolRunRequest) -> Jo
     app = _app(request)
     app.tools.get(tool_name)  # 404s if unknown, before scheduling a Job for it
 
+    # Workspace-scoped tools (TOOL-002) require workspace_id as a schema property of
+    # `arguments` itself, since a ToolHandler only ever sees `arguments`; fall back
+    # to that when the caller didn't also pass the separate top-level field.
+    workspace_id = body.workspace_id or body.arguments.get("workspace_id")
+
     async def work(handle: JobHandle) -> dict[str, Any]:
         run = await app.tool_executor.execute(
             tool_name,
             body.arguments,
-            workspace_id=body.workspace_id,
+            workspace_id=workspace_id,
             session_id=body.session_id,
         )
         return {"tool_run_id": run.id, "status": run.status}

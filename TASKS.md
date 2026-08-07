@@ -234,7 +234,7 @@ Task format: ID — title / description / deps / components / acceptance / tests
 - Desc: workspace-scoped tools exposed to agents behind permission classes with allow/ask/deny; approval events.
 - Deps: TOOL-001, WSP-002, PERM-001. Components: tools.
 - Acceptance: DoD MCP/skills/tools permission bullet; approval flow works.
-- Tests: integration incl. deny/ask paths. Status: TODO
+- Tests: integration incl. deny/ask paths. Status: DONE
 
 ### ART-001 Artifacts
 - Desc: artifacts table, typed catalog, disk store for blobs, `/artifacts*` incl. content + checksummed transfer, `artifact://` references.

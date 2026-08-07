@@ -18,7 +18,6 @@ string.
 
 from __future__ import annotations
 
-import posixpath
 from typing import cast
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -30,8 +29,13 @@ from harness.core.domain import Workspace
 from harness.core.errors import ProviderError, ValidationFailedError
 from harness.core.ids import new_id
 from harness.hosts.path_safety import canonicalize_and_check
-from harness.hosts.resolve import build_ssh_host
-from harness.hosts.ssh import ExecChunk, SftpEntry, SSHHost
+from harness.hosts.ssh import SftpEntry, SSHHost
+from harness.workspaces.service import (
+    is_git_repo,
+    resolve_within_workspace,
+    run_git,
+    ssh_host_for_host_id,
+)
 
 router = APIRouter(dependencies=[Depends(require_auth)], tags=["workspaces"])
 
@@ -41,17 +45,7 @@ def _app(request: Request) -> Application:
 
 
 async def _ssh_host_for(app: Application, host_id: str) -> SSHHost:
-    host = await app.hosts.get(host_id)
-    return await build_ssh_host(host, app.secret_refs, app.secret_store)
-
-
-def _resolve_within_workspace(workspace: Workspace, relative_path: str) -> str:
-    """Join a caller-supplied relative path onto the workspace root and verify the
-    result still falls under that root — the workspace-level containment layer, on
-    top of (not instead of) the Host-level check `SSHHost` performs on every call.
-    """
-    absolute = posixpath.normpath(posixpath.join(workspace.root_path, relative_path.lstrip("/")))
-    return canonicalize_and_check(absolute, [workspace.root_path])
+    return await ssh_host_for_host_id(host_id, app.hosts, app.secret_refs, app.secret_store)
 
 
 class WorkspaceCreate(BaseModel):
@@ -121,7 +115,7 @@ async def get_workspace_tree(
 ) -> list[SftpEntry]:
     app = _app(request)
     workspace = await app.workspaces.get(workspace_id)
-    absolute = _resolve_within_workspace(workspace, path)
+    absolute = resolve_within_workspace(workspace, path)
     ssh_host = await _ssh_host_for(app, workspace.host_id)
     return await ssh_host.list_dir(absolute)
 
@@ -139,7 +133,7 @@ async def read_workspace_file(
 ) -> FileContent:
     app = _app(request)
     workspace = await app.workspaces.get(workspace_id)
-    absolute = _resolve_within_workspace(workspace, path)
+    absolute = resolve_within_workspace(workspace, path)
     ssh_host = await _ssh_host_for(app, workspace.host_id)
     data = await ssh_host.read_file(absolute)
     try:
@@ -157,28 +151,9 @@ class FileWrite(BaseModel):
 async def write_workspace_file(request: Request, workspace_id: str, body: FileWrite) -> None:
     app = _app(request)
     workspace = await app.workspaces.get(workspace_id)
-    absolute = _resolve_within_workspace(workspace, body.path)
+    absolute = resolve_within_workspace(workspace, body.path)
     ssh_host = await _ssh_host_for(app, workspace.host_id)
     await ssh_host.write_file(absolute, body.content.encode("utf-8"))
-
-
-async def _run_git(ssh_host: SSHHost, root_path: str, args: list[str]) -> tuple[int, str, str]:
-    """Run `git -C <root_path> <args...>` via structured argv exec and collect its
-    output. Returns (exit_status, stdout, stderr); never raises on a nonzero exit —
-    callers decide what a failing git invocation means (not a repo, merge conflict,
-    nothing to commit, ...).
-    """
-    argv = ["git", "-C", root_path, *args]
-    chunks: list[ExecChunk] = [c async for c in ssh_host.exec_stream(argv)]
-    stdout = "".join(c.data for c in chunks if c.stream == "stdout")
-    stderr = "".join(c.data for c in chunks if c.stream == "stderr")
-    exit_status = chunks[-1].exit_status if chunks[-1].exit_status is not None else -1
-    return exit_status, stdout, stderr
-
-
-async def _is_git_repo(ssh_host: SSHHost, root_path: str) -> bool:
-    exit_status, _, _ = await _run_git(ssh_host, root_path, ["rev-parse", "--is-inside-work-tree"])
-    return exit_status == 0
 
 
 class WorkspaceDiff(BaseModel):
@@ -201,10 +176,10 @@ async def get_workspace_diff(
 
 
 async def _diff(ssh_host: SSHHost, root_path: str, path: str) -> WorkspaceDiff:
-    if not await _is_git_repo(ssh_host, root_path):
+    if not await is_git_repo(ssh_host, root_path):
         return WorkspaceDiff(is_git_repo=False, diff="")
     args = ["diff", "--", path] if path else ["diff"]
-    _, stdout, _ = await _run_git(ssh_host, root_path, args)
+    _, stdout, _ = await run_git(ssh_host, root_path, args)
     return WorkspaceDiff(is_git_repo=True, diff=stdout)
 
 
@@ -218,7 +193,7 @@ async def git_init(request: Request, workspace_id: str) -> GitInitResult:
     app = _app(request)
     workspace = await app.workspaces.get(workspace_id)
     ssh_host = await _ssh_host_for(app, workspace.host_id)
-    exit_status, stdout, stderr = await _run_git(ssh_host, workspace.root_path, ["init"])
+    exit_status, stdout, stderr = await run_git(ssh_host, workspace.root_path, ["init"])
     if exit_status != 0:
         raise ProviderError(f"git init failed: {stderr.strip() or stdout.strip()}")
     return GitInitResult(ok=True, output=stdout)
@@ -250,15 +225,11 @@ async def git_status(request: Request, workspace_id: str) -> GitStatus:
     app = _app(request)
     workspace = await app.workspaces.get(workspace_id)
     ssh_host = await _ssh_host_for(app, workspace.host_id)
-    if not await _is_git_repo(ssh_host, workspace.root_path):
+    if not await is_git_repo(ssh_host, workspace.root_path):
         return GitStatus(is_git_repo=False)
 
-    _, branch_stdout, _ = await _run_git(
-        ssh_host, workspace.root_path, ["branch", "--show-current"]
-    )
-    _, status_stdout, _ = await _run_git(
-        ssh_host, workspace.root_path, ["status", "--porcelain=v1"]
-    )
+    _, branch_stdout, _ = await run_git(ssh_host, workspace.root_path, ["branch", "--show-current"])
+    _, status_stdout, _ = await run_git(ssh_host, workspace.root_path, ["status", "--porcelain=v1"])
     entries = [
         GitStatusEntry(status=line[:2], path=line[3:])
         for line in status_stdout.splitlines()
@@ -276,7 +247,7 @@ async def git_add(request: Request, workspace_id: str, body: GitAddRequest) -> G
     app = _app(request)
     workspace = await app.workspaces.get(workspace_id)
     ssh_host = await _ssh_host_for(app, workspace.host_id)
-    exit_status, stdout, stderr = await _run_git(
+    exit_status, stdout, stderr = await run_git(
         ssh_host, workspace.root_path, ["add", "--", *body.paths]
     )
     if exit_status != 0:
@@ -309,13 +280,13 @@ async def git_commit(
         config_args += ["-c", f"user.name={body.author_name}"]
     if body.author_email:
         config_args += ["-c", f"user.email={body.author_email}"]
-    exit_status, stdout, stderr = await _run_git(
+    exit_status, stdout, stderr = await run_git(
         ssh_host, workspace.root_path, [*config_args, "commit", "-m", body.message]
     )
     if exit_status != 0:
         return GitCommitResult(ok=False, output=stderr.strip() or stdout.strip())
 
-    _, hash_stdout, _ = await _run_git(ssh_host, workspace.root_path, ["rev-parse", "HEAD"])
+    _, hash_stdout, _ = await run_git(ssh_host, workspace.root_path, ["rev-parse", "HEAD"])
     return GitCommitResult(ok=True, commit_hash=hash_stdout.strip() or None, output=stdout)
 
 
@@ -329,7 +300,7 @@ async def git_list_branches(request: Request, workspace_id: str) -> list[GitBran
     app = _app(request)
     workspace = await app.workspaces.get(workspace_id)
     ssh_host = await _ssh_host_for(app, workspace.host_id)
-    _, stdout, _ = await _run_git(ssh_host, workspace.root_path, ["branch", "--list"])
+    _, stdout, _ = await run_git(ssh_host, workspace.root_path, ["branch", "--list"])
     branches = []
     for line in stdout.splitlines():
         if not line.strip():
@@ -352,7 +323,7 @@ async def git_create_branch(
     workspace = await app.workspaces.get(workspace_id)
     ssh_host = await _ssh_host_for(app, workspace.host_id)
     args = ["checkout", "-b", body.name] if body.checkout else ["branch", body.name]
-    exit_status, stdout, stderr = await _run_git(ssh_host, workspace.root_path, args)
+    exit_status, stdout, stderr = await run_git(ssh_host, workspace.root_path, args)
     if exit_status != 0:
         raise ProviderError(f"git branch failed: {stderr.strip() or stdout.strip()}")
     return GitInitResult(ok=True, output=stdout)
@@ -375,9 +346,9 @@ async def git_log(
     app = _app(request)
     workspace = await app.workspaces.get(workspace_id)
     ssh_host = await _ssh_host_for(app, workspace.host_id)
-    if not await _is_git_repo(ssh_host, workspace.root_path):
+    if not await is_git_repo(ssh_host, workspace.root_path):
         return []
-    exit_status, stdout, _ = await _run_git(
+    exit_status, stdout, _ = await run_git(
         ssh_host,
         workspace.root_path,
         ["log", f"-n{limit}", f"--pretty=format:{_LOG_FORMAT}", "--date=iso-strict"],
