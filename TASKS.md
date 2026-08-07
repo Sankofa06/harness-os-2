@@ -176,7 +176,7 @@ Task format: ID — title / description / deps / components / acceptance / tests
 - Desc: catalog, pricing/usage/routing metadata, namespaced routing settings.
 - Deps: LP-003. Components: providers.language.
 - Acceptance: catalog + chat against fixture; cost metadata captured.
-- Tests: fixture tests. Status: TODO
+- Tests: fixture tests. Status: DONE
 
 ### LP-007 OpenAI + Anthropic + Gemini native adapters
 - Desc: native message/tool semantics per provider, secret references, usage capture.

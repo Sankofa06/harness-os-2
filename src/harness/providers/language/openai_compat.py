@@ -33,6 +33,7 @@ class OpenAICompatibleProvider(LanguageProvider):
         *,
         api_key: str | None = None,
         http_client: httpx.AsyncClient | None = None,
+        extra_payload: dict[str, Any] | None = None,
     ) -> None:
         self.provider_id = provider_id
         self.display_name = display_name
@@ -40,6 +41,9 @@ class OpenAICompatibleProvider(LanguageProvider):
         headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
         self._client = http_client or httpx.AsyncClient(headers=headers, timeout=60.0)
         self._owns_client = http_client is None
+        # Subclasses (e.g. OpenRouter) that need provider-specific request fields on
+        # every chat call inject them here rather than duplicating chat_stream.
+        self._extra_payload = extra_payload or {}
 
     async def aclose(self) -> None:
         if self._owns_client:
@@ -73,6 +77,7 @@ class OpenAICompatibleProvider(LanguageProvider):
             "messages": [{"role": m.role, "content": m.content} for m in request.messages],
             "stream": True,
             "stream_options": {"include_usage": True},
+            **self._extra_payload,
             **common,
         }
         try:
@@ -98,6 +103,7 @@ def _parse_chunk(chunk: dict[str, Any]) -> ChatStreamItem:
         ChatUsage(
             input_tokens=usage_data.get("prompt_tokens"),
             output_tokens=usage_data.get("completion_tokens"),
+            cost=usage_data.get("cost"),
         )
         if usage_data
         else None

@@ -37,6 +37,9 @@ class ChatUsage(BaseModel):
     input_tokens: int | None = None
     output_tokens: int | None = None
     cached_tokens: int | None = None
+    # Authoritative USD cost, when a provider reports real spend (SPEC/ANALYTICS_
+    # BENCHMARKS.md "estimated/actual cloud cost when provider supplies pricing/usage").
+    cost: float | None = None
 
 
 class ChatStreamItem(BaseModel):

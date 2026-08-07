@@ -134,3 +134,21 @@ Format: decision / reason / alternatives / consequences.
 - Consequences: `common.max_output_tokens` maps to Ollama's `num_predict` option
   (`_translate_common`); other common fields not present in Ollama's `options` are
   simply omitted rather than guessed.
+
+## D-017 — `OpenAICompatibleProvider` gained an `extra_payload` hook for OpenRouter's cost accounting
+- Decision: `OpenAICompatibleProvider.__init__` accepts `extra_payload: dict | None`,
+  merged into every chat request. `OpenRouterProvider` subclasses it purely to set
+  `{"usage": {"include": true}}`, which makes OpenRouter return an authoritative
+  per-request USD cost in the final streamed usage chunk. `ChatUsage` gained an
+  optional `cost` field to carry this, and the run loop now writes it into
+  `RunMetrics.cost_estimate` when a provider reports it.
+- Reason: OpenRouter's chat/completions endpoint is otherwise identical to the
+  generic OpenAI-compatible shape (SPEC/PROVIDER_MATRIX.md explicitly groups them),
+  so subclassing avoids duplicating SSE parsing; the cost field only appears in the
+  response when the request opts in, so an extension point was necessary rather than
+  hard-coding a new field into the base adapter for every consumer.
+- Verification: `usage.cost`/`usage: {"include": true}` behavior confirmed against
+  OpenRouter's public docs, not assumed.
+- Consequences: any future adapter needing a small per-request payload addition (not
+  a full protocol departure) can reuse the same hook instead of re-implementing chat
+  streaming.

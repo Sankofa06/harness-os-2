@@ -164,6 +164,7 @@ async def _run_contact(
         first_token_at: float | None = None
         chunks: list[str] = []
         usage_in = usage_out = None
+        cost_estimate: float | None = None
         finish_reason = "stop"
 
         async for item in provider.chat_stream(request):
@@ -194,6 +195,8 @@ async def _run_contact(
                 if item.usage:
                     usage_in = item.usage.input_tokens
                     usage_out = item.usage.output_tokens
+                    if item.usage.cost is not None:
+                        cost_estimate = item.usage.cost
 
         duration_ms = (time.monotonic() - started) * 1000
         ttft_ms = (first_token_at - started) * 1000 if first_token_at else None
@@ -217,6 +220,7 @@ async def _run_contact(
                 tokens_per_second=tokens_per_second,
                 duration_ms=duration_ms,
                 finish_reason=finish_reason,
+                cost_estimate=cost_estimate,
                 outcome="succeeded",
                 budget=compiled.budget.model_dump(),
             )
