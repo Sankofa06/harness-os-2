@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 
 from harness.context.tokens import TokenEstimator
 from harness.core.config import ContextConfig
-from harness.core.domain import Contact, Message, Persona, Role
+from harness.core.domain import Contact, Message, Persona, Role, TranscriptState
 
 # Immutable minimal Harness protocol (layer 1). Deliberately terse: context is budgeted.
 BASE_PROTOCOL = """\
@@ -37,6 +37,28 @@ class CompiledContext(BaseModel):
     budget: BudgetReport
 
 
+def _render_protected_facts(state: TranscriptState | None) -> str:
+    """Render the SPEC/CONTEXT_COMPILER.md "never summarize away" facts as one
+    text block, or "" if `state` is unset or has nothing recorded yet.
+    """
+    if state is None:
+        return ""
+    lines = []
+    if state.unresolved_requirements:
+        lines.append("Unresolved requirements: " + "; ".join(state.unresolved_requirements))
+    if state.current_plan:
+        lines.append(f"Current plan: {state.current_plan}")
+    if state.changed_files:
+        lines.append("Changed files: " + ", ".join(state.changed_files))
+    if state.failing_tests:
+        lines.append("Failing tests: " + ", ".join(state.failing_tests))
+    if state.permission_decisions:
+        lines.append("Permission decisions: " + "; ".join(state.permission_decisions))
+    if not lines:
+        return ""
+    return "Protected session facts (do not lose these):\n" + "\n".join(lines)
+
+
 class ContextCompiler:
     def __init__(self, estimator: TokenEstimator, config: ContextConfig) -> None:
         self._estimator = estimator
@@ -52,6 +74,7 @@ class ContextCompiler:
         session_state: str = "",
         activated_skills: list[tuple[str, str]] | None = None,
         active_tool_schemas: list[tuple[str, str]] | None = None,
+        transcript_state: TranscriptState | None = None,
     ) -> CompiledContext:
         est = self._estimator.estimate
         budget_max = self._config.default_budget_tokens
@@ -101,7 +124,14 @@ class ContextCompiler:
         sections["workspace"] = 0
         sections["artifacts"] = 0
 
-        system_prompt = "\n\n".join(system_parts)
+        # Protected facts (CTX-003): explicitly excluded from history trimming —
+        # unlike the recent-conversation window below, these are never dropped for
+        # budget, only ever included or (if unset) absent. Charged against the
+        # budget like every other always-on section, not squeezed out of it.
+        protected_text = _render_protected_facts(transcript_state)
+        if protected_text:
+            system_parts.append(protected_text)
+        sections["protected_facts"] = est(protected_text) if protected_text else 0
 
         # Layer 5 — recent conversation within the history budget.
         overhead = sum(sections.values())
@@ -122,6 +152,19 @@ class ContextCompiler:
         included.reverse()
         sections["history"] = history_used
 
+        # If older turns didn't fit, say so rather than silently dropping them —
+        # and carry forward whatever rolling summary a caller has maintained for
+        # them (CTX-003; the compiler never generates this summary itself).
+        omitted = len(history) - len(included)
+        if omitted > 0:
+            note = f"({omitted} earlier message{'s' if omitted != 1 else ''} omitted for budget.)"
+            if transcript_state and transcript_state.rolling_summary:
+                note += f" Earlier conversation summary: {transcript_state.rolling_summary}"
+            system_parts.append(note)
+            sections["protected_facts"] += est(note)
+
+        system_prompt = "\n\n".join(system_parts)
+
         messages = [{"role": "system", "content": system_prompt}] + [
             {"role": m.role, "content": m.content} for m in included
         ]
@@ -131,7 +174,7 @@ class ContextCompiler:
             messages=messages,
             budget=BudgetReport(
                 max=budget_max,
-                used=overhead + history_used,
+                used=sum(sections.values()),
                 estimator=self._estimator.name,
                 sections=sections,
             ),

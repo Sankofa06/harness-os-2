@@ -534,3 +534,34 @@ Format: decision / reason / alternatives / consequences.
 - Consequences: any future Artifact source (a creative-compute adapter, a browser
   direct-to-workspace flow) should produce an `Artifact` via the existing creation
   path and use `push`/`pull` rather than inventing a new transfer primitive.
+
+## D-035 — "Never summarize away" facts are explicit, typed, caller-maintained state — not inferred
+- Decision: CTX-003's protected facts (unresolved requirements, current plan,
+  changed files, failing tests, permission decisions) and the rolling summary of
+  trimmed history live in a new `TranscriptState` — a small typed record per
+  session (`session_transcript_state` table, `TranscriptStateRepo`) that a caller
+  sets explicitly via `PATCH /sessions/{id}/transcript-state`. The Context
+  Compiler (`ContextCompiler.compile`) takes an optional `TranscriptState` and
+  renders its non-empty fields as a dedicated `protected_facts` section that is
+  *never* subject to the history-trimming budget squeeze — it's sized and
+  subtracted from the budget alongside every other always-on layer (base/role/
+  personas), so recent-conversation trimming happens around it, not through it.
+  The compiler does not generate the rolling summary itself; it only renders
+  whatever a caller already wrote there, verbatim, and only when messages were
+  actually dropped.
+- Reason: SPEC/CONTEXT_COMPILER.md's "never summarize away" list names concrete,
+  structured facts, not "whatever seems important" — the reliable way to guarantee
+  they survive is to never let them enter the token-budget trimming path at all,
+  rather than trying to detect and protect them heuristically inside a general
+  history-summarization pass. Building an LLM-based summarizer to *generate* the
+  rolling summary was explicitly out of scope for this task: it would require a
+  real background job, a provider call, and non-deterministic output for what is
+  otherwise a fast, synchronous, fully-deterministic compile step every other test
+  in `tests/context/` already depends on. Keeping the summary caller-maintained
+  keeps that determinism while leaving the door open for AGT-006 (or a future
+  dedicated summarization job) to write to it later without touching the compiler.
+- Consequences: nothing populates `TranscriptState` automatically yet — a run loop
+  extension or tool-result hook must call `PATCH /sessions/{id}/transcript-state`
+  for these facts to exist. The compiler and its "always included, never trimmed"
+  guarantee are already correct and tested for whenever that wiring lands; this is
+  a deliberately incremental scope, not a missed integration.

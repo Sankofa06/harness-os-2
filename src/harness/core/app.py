@@ -37,6 +37,7 @@ from harness.persistence.repos import (
     TeamRepo,
 )
 from harness.persistence.repos_artifacts import ArtifactRepo
+from harness.persistence.repos_context import TranscriptStateRepo
 from harness.persistence.repos_control_plane import HostRepo, ModelProfileRepo, ProviderConfigRepo
 from harness.persistence.repos_jobs import JobRepo
 from harness.persistence.repos_model_instances import ModelInstanceRepo
@@ -89,6 +90,7 @@ class Application:
     permission_engine: PermissionEngine
     artifacts: ArtifactRepo
     artifact_blobs: ArtifactBlobStore
+    transcript_state: TranscriptStateRepo
     compiler: ContextCompiler
     api_token: str
     system_binding: Binding = field(default_factory=lambda: SYSTEM_DEFAULT_BINDING)
@@ -184,6 +186,7 @@ async def create_application(config: HarnessConfig | None = None) -> Application
 
     artifacts = ArtifactRepo(db)
     artifact_blobs = ArtifactBlobStore(config.data_dir / "artifacts")
+    transcript_state = TranscriptStateRepo(db)
 
     compiler = ContextCompiler(HeuristicEstimator(), config.context)
 
@@ -217,6 +220,7 @@ async def create_application(config: HarnessConfig | None = None) -> Application
         permission_engine=permission_engine,
         artifacts=artifacts,
         artifact_blobs=artifact_blobs,
+        transcript_state=transcript_state,
         compiler=compiler,
         api_token=token,
     )

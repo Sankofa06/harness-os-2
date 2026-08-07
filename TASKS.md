@@ -286,7 +286,7 @@ Task format: ID — title / description / deps / components / acceptance / tests
 - Desc: recent window, structured session state, rolling summaries, preserved tool outcomes/artifact refs; never summarize away unresolved requirements/plan/changed files/failing tests/permission decisions.
 - Deps: CTX-002. Components: context.
 - Acceptance: long-session compile keeps protected facts.
-- Tests: unit compaction tests. Status: TODO
+- Tests: unit compaction tests. Status: DONE
 
 ### CTX-004 [VS] Context regression tests
 - Desc: representative sessions compiled in CI asserting ≤4K bootstrap, ≤8K normal, ≤16K expanded; fails on eager schema injection.

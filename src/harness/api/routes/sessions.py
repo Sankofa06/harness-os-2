@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import cast
 
 from fastapi import APIRouter, Depends, Request
+from pydantic import BaseModel
 
 from harness.agents.runloop import handle_user_message
 from harness.api.auth import require_auth
@@ -16,7 +17,7 @@ from harness.api.schemas import (
     SessionCreate,
 )
 from harness.core.app import Application
-from harness.core.domain import Session
+from harness.core.domain import Session, TranscriptState
 from harness.core.errors import NotFoundError
 from harness.core.ids import new_id
 from harness.events.model import Event, EventResource
@@ -94,3 +95,33 @@ async def set_contact_binding(
     await app.contacts.get(contact_id)
     await app.sessions.set_member_override(session_id, contact_id, body.binding)
     return {"status": "ok"}
+
+
+@router.get("/sessions/{session_id}/transcript-state")
+async def get_transcript_state(request: Request, session_id: str) -> TranscriptState:
+    app = _app(request)
+    await app.sessions.get(session_id)  # 404s if the session doesn't exist
+    return await app.transcript_state.get(session_id)
+
+
+class TranscriptStateUpdate(BaseModel):
+    """Every field is optional and, when provided, replaces the current value
+    outright (CTX-003) — the caller is expected to send the full updated list for
+    e.g. `changed_files`, not a delta to merge.
+    """
+
+    unresolved_requirements: list[str] | None = None
+    current_plan: str | None = None
+    changed_files: list[str] | None = None
+    failing_tests: list[str] | None = None
+    permission_decisions: list[str] | None = None
+    rolling_summary: str | None = None
+
+
+@router.patch("/sessions/{session_id}/transcript-state")
+async def update_transcript_state(
+    request: Request, session_id: str, body: TranscriptStateUpdate
+) -> TranscriptState:
+    app = _app(request)
+    await app.sessions.get(session_id)
+    return await app.transcript_state.update(session_id, **body.model_dump(exclude_unset=True))

@@ -175,6 +175,27 @@ class Session(BaseModel):
     updated_at: str = ""
 
 
+class TranscriptState(BaseModel):
+    """Structured, explicitly-maintained session facts that must survive history
+    trimming (CTX-003, SPEC/CONTEXT_COMPILER.md's "never summarize away" list:
+    unresolved requirements, current plan, changed files, failing tests, permission
+    decisions). Distinct from the Context Compiler's freeform ``session_state``
+    string (CTX-002, layer 4) — these are typed facts a caller (the run loop, a
+    tool-result handler) sets directly, not something inferred from conversation
+    text. ``rolling_summary`` is likewise caller-maintained; the compiler only
+    ever includes it verbatim, never generates it.
+    """
+
+    session_id: str
+    unresolved_requirements: list[str] = Field(default_factory=list)
+    current_plan: str = ""
+    changed_files: list[str] = Field(default_factory=list)
+    failing_tests: list[str] = Field(default_factory=list)
+    permission_decisions: list[str] = Field(default_factory=list)
+    rolling_summary: str = ""
+    updated_at: str = ""
+
+
 MessageRole = Literal["user", "assistant", "system", "tool"]
 
 

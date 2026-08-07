@@ -96,11 +96,24 @@ already share, and emit `artifact.created`/`artifact.transferred` events. Proven
 against a real local SSH server, including a full push-then-pull round trip and a
 path-traversal rejection on pull.
 
+CTX-003 (Transcript management) is also done: a new `TranscriptState` (per
+session, `session_transcript_state` table) holds explicit, typed "protected"
+facts — unresolved requirements, current plan, changed files, failing tests,
+permission decisions, plus a caller-maintained rolling summary — that the Context
+Compiler now always includes verbatim, exempt from the history-trimming budget
+squeeze (proven by a test where the budget is too small to fit *any* history
+message, yet every protected fact still appears in the compiled prompt). When
+older messages genuinely don't fit, the compiler now says so explicitly
+("N earlier messages omitted for budget") and appends the rolling summary if one
+exists, rather than silently truncating with no trace. `GET`/`PATCH /sessions/{id}/
+transcript-state` let callers (the run loop, a future tool-result hook) read and
+update it; the run loop now fetches it and passes it into every `compile()` call,
+proven end-to-end via the real `context.compiled` event's budget report.
+
 ## Active task
-None in flight. Milestone 4 (Execution) is fully done. Remaining Milestone 5 work
-(all now unblocked): CTX-003 (transcript management), CTX-004 (context regression
-tests in CI), AGT-006 (delegation/orchestration graph, needs TOOL-001 — now done),
-AGT-007 (stop/cancel). Next up per `TASKS.md` order: CTX-003.
+None in flight. Remaining Milestone 5 work (all now unblocked): CTX-004 (context
+regression tests in CI), AGT-006 (delegation/orchestration graph), AGT-007
+(stop/cancel). Next up per `TASKS.md` order: CTX-004.
 
 ## Completed milestones
 - Phase 1: full spec-kit reading pass (all `SPEC/`, `ADR/`, `BUILD/`, `TESTING/`,
@@ -144,7 +157,7 @@ AGT-007 (stop/cancel). Next up per `TASKS.md` order: CTX-003.
   SPEC/HOSTS_AND_NODE.md, `host_capabilities` table).
 
 ## Known failures
-None functionally. 236/236 backend tests pass (repeatedly and reliably — see D-030
+None functionally. 246/246 backend tests pass (repeatedly and reliably — see D-030
 for a concurrency race that used to make some flaky before its fix), 2/2 web
 unit tests pass, 1/1 Playwright e2e test passes. `ruff check`, `ruff format --check`,
 and `mypy --strict` are clean on `src/harness`. `eslint`, `vitest`, and `tsc -b &&
@@ -158,7 +171,7 @@ asyncio interaction, not an application bug.
 None.
 
 ## Architectural decisions made during implementation
-See `DECISIONS.md` for the full list (D-001 through D-034). Notable ones affecting
+See `DECISIONS.md` for the full list (D-001 through D-035). Notable ones affecting
 what's built so far:
 - D-003/D-004: SQLAlchemy async + plain SQL migrations, schema grows incrementally
   per subsystem milestone rather than all at once.
@@ -173,8 +186,8 @@ what's built so far:
 - D-014: license selection is deferred to the project owner (placeholder in place).
 
 ## What is NOT yet built
-CTX-003/004 (transcript management, context regression CI), AGT-006/007
-(delegation/orchestration graph, stop/cancel), MCP/skills, creative compute,
+CTX-004 (context regression CI), AGT-006/007 (delegation/orchestration graph,
+stop/cancel), MCP/skills, creative compute,
 analytics/benchmarks, the Node daemon, the rest of the WebUI (graph/compute/models/
 creative/assets/analytics/approvals views, full three-panel IA, context meter,
 accessibility audit), TUI feature completion, demo mode content, screenshot
@@ -208,7 +221,7 @@ HARNESS_DEMO_MODE=1 uv run harness serve
 
 Test suites:
 ```bash
-uv run pytest tests -q                      # backend: 236 tests
+uv run pytest tests -q                      # backend: 246 tests
 cd web && npm run test                      # web unit: vitest
 cd web && npx playwright test               # web e2e (needs both servers running)
 ```

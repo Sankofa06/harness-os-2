@@ -22,6 +22,8 @@ names; file paths may evolve. Status: PLANNED / IMPLEMENTED / PASSING.
 | Tool/MCP/skill bodies lazy | `tests/context/test_compiler.py::test_activated_skill_adds_cost_only_when_activated` | PASSING |
 | Budget report works | `tests/context/test_compiler.py` (`BudgetReport` shape) | PASSING |
 | Regression on eager injection | `tests/context/test_compiler.py::test_no_tools_or_skills_means_zero_cost_sections` | PASSING |
+| Long-session compile keeps protected facts (unresolved reqs/plan/changed files/failing tests/permission decisions) even when history is fully squeezed out | `tests/context/test_transcript_state.py::test_protected_facts_survive_a_budget_too_small_for_any_history` | PASSING |
+| Structured session state + rolling summary persisted per session; run loop compiles it in | `tests/api/test_transcript_state.py` | PASSING |
 
 ## Providers
 | Generic OpenAI-compatible works | `tests/providers/test_openai_compat.py` vs fake server | PASSING |

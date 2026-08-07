@@ -127,8 +127,13 @@ async def _run_contact(
         )
 
         history = await app.messages.list_for_session(session_id)
+        transcript_state = await app.transcript_state.get(session_id)
         compiled = app.compiler.compile(
-            contact=contact, role=role, personas=personas, history=history
+            contact=contact,
+            role=role,
+            personas=personas,
+            history=history,
+            transcript_state=transcript_state,
         )
         await app.publish(
             Event(
