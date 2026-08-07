@@ -205,6 +205,42 @@ class Run(BaseModel):
     finished_at: str | None = None
 
 
+PermissionClass = Literal[
+    "read",
+    "write",
+    "execute",
+    "network",
+    "git",
+    "process",
+    "model_lifecycle",
+    "creative_generation",
+    "training",
+    "destructive",
+]
+
+ToolRunStatus = Literal["pending", "running", "succeeded", "failed", "denied", "pending_approval"]
+
+
+class ToolRun(BaseModel):
+    """Persisted record of one tool invocation (TOOL-001, SPEC/MCP_SKILLS_TOOLS.md
+    lifecycle). Distinct from a `Job`: a tool run is always driven by the lifecycle
+    in `harness.tools.lifecycle`, and its ``permission_class``/``status`` vocabulary
+    is PERM-001's, not the generic Job state machine.
+    """
+
+    id: str
+    tool_name: str
+    arguments: dict[str, Any] = Field(default_factory=dict)
+    permission_class: PermissionClass
+    status: ToolRunStatus = "pending"
+    result: dict[str, Any] | None = None
+    error: str | None = None
+    workspace_id: str | None = None
+    session_id: str | None = None
+    created_at: str = ""
+    finished_at: str | None = None
+
+
 class RunMetrics(BaseModel):
     run_id: str
     input_tokens: int | None = None

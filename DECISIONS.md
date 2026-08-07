@@ -355,3 +355,47 @@ Format: decision / reason / alternatives / consequences.
 - Consequences: any future git subcommand endpoint must decide, case by case,
   whether its failure modes are "normal, report as ok:false" or "abnormal, raise" —
   there's no blanket rule the router applies automatically.
+
+## D-028 — Tool permission resolution is a Protocol; PERM-001 fills it in later
+- Decision: `ToolExecutor` (TOOL-001) takes a `PermissionResolver` — a `Protocol`
+  with one method, `resolve(permission_class) -> "allow"|"ask"|"deny"` — as a
+  constructor argument rather than importing a concrete permission engine. The only
+  implementation that exists yet, `AllowAllResolver`, always returns `"allow"`.
+  `Application` wires it in `create_application()`. The lifecycle's branching on
+  all three outcomes (`deny` -> `ToolRun.status="denied"` + `tool.denied`; `ask` ->
+  `status="pending_approval"` + `tool.pending_approval`; `allow` -> execute) is
+  fully implemented and unit-tested with a fake resolver
+  (`tests/unit/test_tool_lifecycle.py`), even though nothing in the running system
+  can currently produce `ask`/`deny` outcomes.
+- Reason: TOOL-001 (this task) and PERM-001 (a real class×policy resolver with a
+  persisted decision table and an approval-blocking API) are separate TASKS.md
+  entries with TOOL-002 depending on both. Building the lifecycle against an
+  abstract resolver now means PERM-001 is a pure additive change later — a new
+  `PermissionResolver` implementation swapped into `create_application()` — with no
+  changes to `ToolExecutor`, `ToolRun`, the event names, or any test that already
+  exercises the three-way branch.
+- Consequences: until PERM-001 lands, every tool call effectively runs
+  unconditionally once a caller reaches `ToolExecutor.execute()` — acceptable
+  because the only tool registered so far (`echo`) is read-only and side-effect
+  free; TOOL-002's file/shell/git tools must not be registered before PERM-001
+  supplies a real resolver, since those carry `write`/`execute`/`git` permission
+  classes that need actual policy enforcement.
+
+## D-029 — Tool execution runs through JobManager like model load/unload
+- Decision: `POST /tools/{name}/run` submits a `JobManager` job whose work function
+  calls `ToolExecutor.execute()` and returns `{"tool_run_id": ..., "status": ...}`;
+  the endpoint responds `202` with the `Job`, not the `ToolRun` directly. Callers
+  poll `/jobs/{id}` for scheduling status or `/tools/runs/{id}` for the
+  lifecycle-specific record (permission decision, compact result, error).
+- Reason: matches LP-009's existing split for model load/unload — Job records
+  generic scheduling/cancellation state, the domain-specific repo (here, ToolRun)
+  records what actually happened. A future TOOL-002 shell tool invoking a
+  long-running remote command needs the same cancelability `JobManager` already
+  gives every other long action (SPEC/API_CONTRACT.md); building tool execution on
+  a plain synchronous endpoint now would mean revisiting every caller once a real
+  long-running tool exists, whereas building it on Jobs from the start costs
+  nothing extra for `echo` (which finishes instantly) and is already correct for
+  what comes next.
+- Consequences: a `ToolRun`'s `id` is not the same as its `Job`'s `id` — API
+  clients that need the `ToolRun` must look it up (by tool name, or by listing
+  `/tools/runs` after the Job succeeds) rather than assume the Job's own ID.

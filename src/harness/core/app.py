@@ -38,11 +38,16 @@ from harness.persistence.repos import (
 from harness.persistence.repos_control_plane import HostRepo, ModelProfileRepo, ProviderConfigRepo
 from harness.persistence.repos_jobs import JobRepo
 from harness.persistence.repos_model_instances import ModelInstanceRepo
+from harness.persistence.repos_tools import ToolRunRepo
 from harness.persistence.repos_workspaces import WorkspaceRepo
 from harness.providers.language.base import LanguageProvider
 from harness.providers.language.factory import build_provider
 from harness.providers.language.fake import FakeProvider
 from harness.providers.language.registry import ProviderRegistry
+from harness.tools.builtin import echo_tool
+from harness.tools.lifecycle import ToolExecutor
+from harness.tools.permissions import AllowAllResolver
+from harness.tools.registry import ToolRegistry
 
 # System-default binding when no contact/role override applies. The fake provider is
 # always registered so the server is usable with zero external configuration.
@@ -72,6 +77,9 @@ class Application:
     model_profiles: ModelProfileRepo
     model_instances: ModelInstanceRepo
     providers: ProviderRegistry
+    tools: ToolRegistry
+    tool_runs: ToolRunRepo
+    tool_executor: ToolExecutor
     compiler: ContextCompiler
     api_token: str
     system_binding: Binding = field(default_factory=lambda: SYSTEM_DEFAULT_BINDING)
@@ -155,6 +163,11 @@ async def create_application(config: HarnessConfig | None = None) -> Application
     providers = ProviderRegistry()
     providers.register(FakeProvider())
 
+    tools = ToolRegistry()
+    tools.register(echo_tool())
+    tool_runs = ToolRunRepo(db)
+    tool_executor = ToolExecutor(tools, tool_runs, bus, AllowAllResolver())
+
     compiler = ContextCompiler(HeuristicEstimator(), config.context)
 
     return Application(
@@ -179,6 +192,9 @@ async def create_application(config: HarnessConfig | None = None) -> Application
         model_profiles=model_profiles,
         model_instances=model_instances,
         providers=providers,
+        tools=tools,
+        tool_runs=tool_runs,
+        tool_executor=tool_executor,
         compiler=compiler,
         api_token=token,
     )

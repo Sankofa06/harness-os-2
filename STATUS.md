@@ -31,8 +31,24 @@ returning `is_git_repo: false` rather than erroring when a folder isn't a repo y
 and reporting a failed commit (e.g. nothing staged) as `{"ok": false, ...}` rather
 than a 5xx.
 
+TOOL-001 (Tool registry + lifecycle) is also done: `harness.tools` implements the
+full SPEC/MCP_SKILLS_TOOLS.md lifecycle (validate JSON-Schema arguments → resolve
+permission → execute → capture result/error → emit events → compact result), backed
+by a persisted `tool_runs` table (`ToolRunRepo`) and run through `JobManager` (same
+pattern as LP-009's model load/unload) so a slow tool is cancelable like any other
+long action. Permission resolution goes through a `PermissionResolver` Protocol;
+the only implementation so far is `AllowAllResolver` — an explicit stand-in, not a
+fake permission system — so "ask"/"deny" are real, tested code paths
+(`pending_approval`/`denied` ToolRun states, `tool.denied`/`tool.pending_approval`
+events) with no caller able to produce them yet. PERM-001 will supply the real
+resolver. One built-in tool (`echo`, permission class `read`) is always registered,
+mirroring `FakeProvider`'s role for language providers — a real, safe, zero-config
+tool to exercise the lifecycle against. `/tools`, `/tools/{name}/run`, `/tools/
+runs*` expose it over the API.
+
 ## Active task
-None in flight. Next up per `TASKS.md`: TOOL-001 (Tool registry + lifecycle).
+None in flight. Next up per `TASKS.md`: PERM-001 (Permission engine), which unlocks
+TOOL-002 (file/shell/git tools with real permission classes).
 
 ## Completed milestones
 - Phase 1: full spec-kit reading pass (all `SPEC/`, `ADR/`, `BUILD/`, `TESTING/`,
@@ -76,7 +92,7 @@ None in flight. Next up per `TASKS.md`: TOOL-001 (Tool registry + lifecycle).
   SPEC/HOSTS_AND_NODE.md, `host_capabilities` table).
 
 ## Known failures
-None functionally. 192/192 backend tests pass, 2/2 web unit tests pass, 1/1 Playwright
+None functionally. 203/203 backend tests pass, 2/2 web unit tests pass, 1/1 Playwright
 e2e test passes. `ruff check`, `ruff format --check`, and `mypy --strict` are clean on
 `src/harness`. `eslint`, `vitest`, and `tsc -b && vite build` are clean on `web/`.
 Cosmetic: some test runs emit a `PytestUnhandledThreadExceptionWarning` from an
@@ -88,7 +104,7 @@ asyncio interaction, not an application bug.
 None.
 
 ## Architectural decisions made during implementation
-See `DECISIONS.md` for the full list (D-001 through D-027). Notable ones affecting
+See `DECISIONS.md` for the full list (D-001 through D-029). Notable ones affecting
 what's built so far:
 - D-003/D-004: SQLAlchemy async + plain SQL migrations, schema grows incrementally
   per subsystem milestone rather than all at once.
@@ -103,8 +119,10 @@ what's built so far:
 - D-014: license selection is deferred to the project owner (placeholder in place).
 
 ## What is NOT yet built
-The Tool registry/lifecycle and permission engine (TOOL-001/002, PERM-001),
-Artifacts (ART-001), MCP/skills, creative compute,
+The permission engine (PERM-001 — a real class×policy resolver and approval API;
+TOOL-001's lifecycle already calls a `PermissionResolver` interface, just not a real
+one yet) and TOOL-002's file/shell/git tools that depend on it, Artifacts
+(ART-001), MCP/skills, creative compute,
 analytics/benchmarks, the Node daemon, the rest of the WebUI (graph/compute/models/
 creative/assets/analytics/approvals views, full three-panel IA, context meter,
 accessibility audit), TUI feature completion, demo mode content, screenshot
@@ -138,7 +156,7 @@ HARNESS_DEMO_MODE=1 uv run harness serve
 
 Test suites:
 ```bash
-uv run pytest tests -q                      # backend: 192 tests
+uv run pytest tests -q                      # backend: 203 tests
 cd web && npm run test                      # web unit: vitest
 cd web && npx playwright test               # web e2e (needs both servers running)
 ```

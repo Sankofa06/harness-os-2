@@ -67,6 +67,7 @@ names; file paths may evolve. Status: PLANNED / IMPLEMENTED / PASSING.
 | Stop/cancel | `tests/api/test_stop.py` | PLANNED (needs AGT-007; job cancel alone is covered) |
 
 ## MCP / skills / tools
+| Tool lifecycle (validate→permission→execute→capture→events); runs recorded in tool_runs | `tests/unit/test_tool_lifecycle.py`, `tests/api/test_tools.py` | PASSING |
 | Add MCP server; compact index; lazy schema | `tests/mcp/test_lazy_index.py` | PLANNED |
 | Skill metadata w/o body load | `tests/skills/test_lazy_skills.py` | PLANNED |
 | Superpower toggles | `tests/skills/test_superpowers.py` | PLANNED |

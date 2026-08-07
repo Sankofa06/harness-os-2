@@ -228,7 +228,7 @@ Task format: ID — title / description / deps / components / acceptance / tests
 - Desc: native tool registry, typed schemas, lifecycle per SPEC/MCP_SKILLS_TOOLS.md (validate→permission→approve→execute→capture→artifact→events→compact result).
 - Deps: EVT-002, JOB-001. Components: tools.
 - Acceptance: tool runs recorded in tool_runs with events.
-- Tests: unit lifecycle tests. Status: TODO
+- Tests: unit lifecycle tests. Status: DONE
 
 ### TOOL-002 File/shell/git tools + permissions
 - Desc: workspace-scoped tools exposed to agents behind permission classes with allow/ask/deny; approval events.
