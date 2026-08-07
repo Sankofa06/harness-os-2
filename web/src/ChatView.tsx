@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { connectEventStream, type HarnessEvent } from "./api/events";
 import { getApiBase, getApiToken } from "./api/config";
-import { HarnessClient, type Contact, type Session } from "./api/client";
+import { HarnessApiError, HarnessClient, type Contact, type Session } from "./api/client";
 
 interface DisplayMessage {
   id: string;
@@ -32,13 +32,23 @@ export function ChatView() {
         let allContacts = await client.listContacts();
         let builder = allContacts.find((c) => c.handle === DEFAULT_CONTACT_HANDLE);
         if (!builder) {
-          builder = await client.createContact({
-            handle: DEFAULT_CONTACT_HANDLE,
-            display_name: "Builder",
-            role: "coder",
-            binding: { provider: "fake", model: "fake-mini" },
-          });
-          allContacts = [...allContacts, builder];
+          try {
+            builder = await client.createContact({
+              handle: DEFAULT_CONTACT_HANDLE,
+              display_name: "Builder",
+              role: "coder",
+              binding: { provider: "fake", model: "fake-mini" },
+            });
+            allContacts = [...allContacts, builder];
+          } catch (err) {
+            // Two mounts of this effect (React StrictMode double-invokes effects in
+            // dev) can race to create the same handle; the loser re-fetches instead
+            // of surfacing the other mount's success as a fatal error.
+            if (!(err instanceof HarnessApiError) || err.code !== "conflict") throw err;
+            allContacts = await client.listContacts();
+            builder = allContacts.find((c) => c.handle === DEFAULT_CONTACT_HANDLE);
+            if (!builder) throw err;
+          }
         }
         if (cancelled) return;
         setContacts(allContacts);

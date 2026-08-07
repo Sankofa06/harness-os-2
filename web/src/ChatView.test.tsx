@@ -86,4 +86,50 @@ describe("ChatView", () => {
     await waitFor(() => expect(screen.getByText("hello back")).toBeInTheDocument());
     expect(screen.getByText("hi there")).toBeInTheDocument();
   });
+
+  it("recovers when contact creation loses a race (e.g. StrictMode double-mount)", async () => {
+    const contact = {
+      id: "con_1",
+      handle: "builder",
+      display_name: "Builder",
+      role_id: null,
+      persona_ids: [],
+      binding: { provider: "fake", model: "fake-mini" },
+    };
+    const session = {
+      id: "ses_1",
+      title: "Harness session",
+      state: "active",
+      contact_ids: ["con_1"],
+      created_at: "now",
+      updated_at: "now",
+    };
+
+    let contactsGetCalls = 0;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+      if (url.endsWith("/contacts") && method === "GET") {
+        contactsGetCalls += 1;
+        // First check (before create) finds nothing; a losing mount's create then
+        // 409s, and its re-check (second GET) finds the winner's contact.
+        return jsonResponse(contactsGetCalls === 1 ? [] : [contact]);
+      }
+      if (url.endsWith("/contacts") && method === "POST") {
+        return jsonResponse(
+          { code: "conflict", message: "contact handle already exists: builder" },
+          409,
+        );
+      }
+      if (url.endsWith("/sessions") && method === "GET") return jsonResponse([]);
+      if (url.endsWith("/sessions") && method === "POST") return jsonResponse(session, 201);
+      throw new Error(`unexpected request: ${method} ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<ChatView />);
+
+    expect(await screen.findByText("@builder")).toBeInTheDocument();
+    expect(screen.queryByText(/Could not reach the Harness API/)).not.toBeInTheDocument();
+  });
 });
