@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from secrets import token_urlsafe
 
+from harness.agents.registry import RunRegistry
 from harness.agents.seeds import seed_agents
 from harness.artifacts.store import ArtifactBlobStore
 from harness.context.compiler import ContextCompiler
@@ -91,6 +92,7 @@ class Application:
     artifacts: ArtifactRepo
     artifact_blobs: ArtifactBlobStore
     transcript_state: TranscriptStateRepo
+    run_registry: RunRegistry
     compiler: ContextCompiler
     api_token: str
     system_binding: Binding = field(default_factory=lambda: SYSTEM_DEFAULT_BINDING)
@@ -187,6 +189,7 @@ async def create_application(config: HarnessConfig | None = None) -> Application
     artifacts = ArtifactRepo(db)
     artifact_blobs = ArtifactBlobStore(config.data_dir / "artifacts")
     transcript_state = TranscriptStateRepo(db)
+    run_registry = RunRegistry()
 
     compiler = ContextCompiler(HeuristicEstimator(), config.context)
 
@@ -221,6 +224,7 @@ async def create_application(config: HarnessConfig | None = None) -> Application
         artifacts=artifacts,
         artifact_blobs=artifact_blobs,
         transcript_state=transcript_state,
+        run_registry=run_registry,
         compiler=compiler,
         api_token=token,
     )

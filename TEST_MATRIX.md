@@ -74,7 +74,7 @@ names; file paths may evolve. Status: PLANNED / IMPLEMENTED / PASSING.
 | Mention one/many/team | `tests/unit/test_mentions.py`, `tests/api/test_run_loop.py` | PASSING |
 | Rebind global/session/turn + snapshots | `tests/unit/test_binding.py`, `tests/api/test_run_loop.py::test_session_binding_override_...` | PASSING |
 | Parallel plan→review→implement | `tests/integration/test_orchestration.py` | PLANNED (needs AGT-006 delegation) |
-| Stop/cancel | `tests/api/test_stop.py` | PLANNED (needs AGT-007; job cancel alone is covered) |
+| Stop/cancel | `tests/api/test_stop.py`, `tests/unit/test_run_registry.py` | PASSING |
 
 ## MCP / skills / tools
 | Tool lifecycle (validate→permission→execute→capture→events); runs recorded in tool_runs | `tests/unit/test_tool_lifecycle.py`, `tests/api/test_tools.py` | PASSING |

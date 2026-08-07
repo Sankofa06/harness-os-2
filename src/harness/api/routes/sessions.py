@@ -86,6 +86,18 @@ async def post_message(request: Request, session_id: str, body: MessageCreate) -
     )
 
 
+@router.post("/sessions/{session_id}/stop")
+async def stop_session(request: Request, session_id: str) -> dict[str, list[str]]:
+    """Cancel every currently in-flight run for this session (AGT-007). Runs that
+    already finished are unaffected; there is nothing wrong with calling this when
+    nothing is running — it just cancels zero runs.
+    """
+    app = _app(request)
+    await app.sessions.get(session_id)  # 404s if the session doesn't exist
+    canceled_run_ids = app.run_registry.cancel_session(session_id)
+    return {"canceled_run_ids": canceled_run_ids}
+
+
 @router.patch("/sessions/{session_id}/contacts/{contact_id}/binding")
 async def set_contact_binding(
     request: Request, session_id: str, contact_id: str, body: BindingOverride

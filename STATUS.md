@@ -120,10 +120,23 @@ default (`bootstrap_target_tokens`=4096, `default_budget_tokens`=8192,
 No separate CI wiring was needed — `.github/workflows/ci.yml`'s existing
 `pytest tests -q` step already covers this directory.
 
+AGT-007 (Stop/cancel) is also done. Each mentioned contact's run now executes as
+its own `asyncio.Task` (`agents/runloop.py`), tracked in a new `RunRegistry`
+(`Application.run_registry`) rather than being awaited sequentially inline —
+`POST /sessions/{id}/stop` reaches into that registry from a separate, later
+request and cancels every task still in flight for that session.
+`_run_contact` now has an explicit `except asyncio.CancelledError` branch that
+marks the `Run` "canceled", publishes `run.canceled`, and re-raises so
+cancellation propagates correctly; `handle_user_message` catches it per-task and
+reports `status: "canceled"` in the response rather than letting one contact's
+cancellation take down the others. Proven with a real concurrent test — a
+message POST is started, allowed to begin streaming, and canceled mid-flight from
+a second concurrent request on the same event loop — including that stopping one
+session's runs leaves a different session's concurrently-running one untouched.
+
 ## Active task
-None in flight. Remaining Milestone 5 work (all now unblocked): AGT-006
-(delegation/orchestration graph), AGT-007 (stop/cancel). Next up per `TASKS.md`
-order: AGT-006.
+None in flight. Remaining Milestone 5 work: AGT-006 (delegation/orchestration
+graph) — the last item in the milestone.
 
 ## Completed milestones
 - Phase 1: full spec-kit reading pass (all `SPEC/`, `ADR/`, `BUILD/`, `TESTING/`,
@@ -167,7 +180,7 @@ order: AGT-006.
   SPEC/HOSTS_AND_NODE.md, `host_capabilities` table).
 
 ## Known failures
-None functionally. 250/250 backend tests pass (repeatedly and reliably — see D-030
+None functionally. 259/259 backend tests pass (repeatedly and reliably — see D-030
 for a concurrency race that used to make some flaky before its fix), 2/2 web
 unit tests pass, 1/1 Playwright e2e test passes. `ruff check`, `ruff format --check`,
 and `mypy --strict` are clean on `src/harness`. `eslint`, `vitest`, and `tsc -b &&
@@ -181,7 +194,7 @@ asyncio interaction, not an application bug.
 None.
 
 ## Architectural decisions made during implementation
-See `DECISIONS.md` for the full list (D-001 through D-036). Notable ones affecting
+See `DECISIONS.md` for the full list (D-001 through D-037). Notable ones affecting
 what's built so far:
 - D-003/D-004: SQLAlchemy async + plain SQL migrations, schema grows incrementally
   per subsystem milestone rather than all at once.
@@ -196,7 +209,7 @@ what's built so far:
 - D-014: license selection is deferred to the project owner (placeholder in place).
 
 ## What is NOT yet built
-AGT-006/007 (delegation/orchestration graph, stop/cancel), MCP/skills, creative compute,
+AGT-006 (delegation/orchestration graph), MCP/skills, creative compute,
 analytics/benchmarks, the Node daemon, the rest of the WebUI (graph/compute/models/
 creative/assets/analytics/approvals views, full three-panel IA, context meter,
 accessibility audit), TUI feature completion, demo mode content, screenshot
@@ -230,7 +243,7 @@ HARNESS_DEMO_MODE=1 uv run harness serve
 
 Test suites:
 ```bash
-uv run pytest tests -q                      # backend: 250 tests
+uv run pytest tests -q                      # backend: 259 tests
 cd web && npm run test                      # web unit: vitest
 cd web && npx playwright test               # web e2e (needs both servers running)
 ```

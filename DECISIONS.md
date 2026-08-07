@@ -584,3 +584,35 @@ Format: decision / reason / alternatives / consequences.
 - Consequences: any future context-budget regression belongs in this same file
   (or another file under `tests/context/`) — there is no separate "CI context
   gate" to update elsewhere; the general test job is the gate.
+
+## D-037 — Per-contact runs became real, cancelable asyncio.Tasks (AGT-007)
+- Decision: `handle_user_message` (agents/runloop.py) now launches each mentioned
+  contact's `_run_contact` coroutine as its own `asyncio.Task`, registered by
+  `run_id` in a new `RunRegistry` (`Application.run_registry`) before any of them
+  are awaited — previously they ran sequentially inline, `await`ed one at a time
+  with no independent handle a later request could act on. `POST /sessions/{id}/
+  stop` looks up every task currently registered for that session and calls
+  `.cancel()` on each; `_run_contact` gained an `except asyncio.CancelledError`
+  branch that marks the `Run` `"canceled"`, publishes `run.canceled`, and
+  re-raises (the correct asyncio pattern: clean up on cancellation, then let it
+  propagate) rather than being silently absorbed by the existing broad `except
+  Exception` (which doesn't catch `CancelledError` in Python 3.8+ regardless,
+  since it isn't an `Exception` subclass — this branch makes that behavior
+  explicit and adds the status/event bookkeeping cancellation needs).
+- Reason: TASKS.md's acceptance bar is literal — "`POST /sessions/{id}/stop`
+  cancels active runs/jobs cleanly" requires an active run to be something a
+  *separate* request can reach and cancel while the original `POST /sessions/{id}/
+  messages` call is still in-flight and blocked awaiting it. That's only possible
+  if each run is a real, independently-addressable `asyncio.Task` rather than a
+  bare coroutine some other call is directly `await`ing — a bare `await` has no
+  handle another coroutine on the same event loop can act on.
+- Consequences: mentioned contacts within one message now run *concurrently*
+  rather than strictly sequentially (each gets its own Task, all started before
+  any are awaited) — a deliberate, tested behavior change (no existing test
+  asserted strict ordering; `test_team_mention_fans_out_to_members` already
+  compared run sets, not lists) that also directly serves AGT-006's "parallel
+  plan→review→implement" requirement, which needs the same concurrent-contacts
+  foundation. `handle_user_message` catches `CancelledError` per-task (not
+  letting one canceled contact's exception propagate and abort collecting the
+  others' outcomes) so a partial `/stop` mid-fan-out still returns a coherent
+  response listing every contact's actual outcome, canceled or not.

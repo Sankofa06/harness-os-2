@@ -310,7 +310,7 @@ Task format: ID — title / description / deps / components / acceptance / tests
 - Desc: `POST /sessions/{id}/stop` cancels active runs/jobs cleanly.
 - Deps: AGT-005, JOB-001. Components: agents.
 - Acceptance: DoD Agents stop bullet.
-- Tests: integration cancel test. Status: TODO
+- Tests: integration cancel test. Status: DONE
 
 ### PERM-001 Permission engine
 - Desc: classes (read/write/execute/network/git/process/model_lifecycle/creative_generation/training/destructive) × policies (allow/ask/deny); resolution explicit + logged; approval API + events.

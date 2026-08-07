@@ -3,10 +3,15 @@
 Implements SPEC/ARCHITECTURE.md's event-driven rule: every state transition (run.started,
 run.binding_snapshot, context.compiled, inference.*, run.failed) is published before the
 API layer touches the database directly, keeping the WebUI/TUI as pure event/REST clients.
+
+Each mentioned contact's run executes concurrently as its own `asyncio.Task`,
+registered in `Application.run_registry` (AGT-007) so `POST /sessions/{id}/stop`
+can cancel any of them mid-flight from a separate, later request.
 """
 
 from __future__ import annotations
 
+import asyncio
 import time
 from dataclasses import dataclass
 from typing import cast
@@ -69,19 +74,34 @@ async def handle_user_message(
     await app.messages.create(session_id, "user", text)
 
     targets = await route_targets(app, session_id, text)
-    outcomes = []
+    started: list[tuple[str, Contact, asyncio.Task[RunOutcome]]] = []
     for contact in targets:
-        outcome = await _run_contact(app, session_id, contact, correlation_id)
-        outcomes.append(outcome)
+        run_id = new_id("run")
+        task = asyncio.create_task(_run_contact(app, session_id, contact, correlation_id, run_id))
+        app.run_registry.register(run_id, session_id, task)
+        started.append((run_id, contact, task))
+
+    outcomes = []
+    for run_id, contact, task in started:
+        try:
+            outcomes.append(await task)
+        except asyncio.CancelledError:
+            outcomes.append(
+                RunOutcome(
+                    run_id=run_id, contact_handle=contact.handle, content="", status="canceled"
+                )
+            )
+        finally:
+            app.run_registry.unregister(run_id, session_id)
     return outcomes
 
 
 async def _run_contact(
-    app: Application, session_id: str, contact: Contact, correlation_id: str
+    app: Application, session_id: str, contact: Contact, correlation_id: str, run_id: str
 ) -> RunOutcome:
     run = await app.runs.create(
         Run(
-            id=new_id("run"),
+            id=run_id,
             session_id=session_id,
             contact_id=contact.id,
             correlation_id=correlation_id,
@@ -252,6 +272,19 @@ async def _run_contact(
         return RunOutcome(
             run_id=run.id, contact_handle=contact.handle, content=content, status="succeeded"
         )
+
+    except asyncio.CancelledError:
+        await app.runs.set_status(run.id, "canceled")
+        await app.publish(
+            Event(
+                type="run.canceled",
+                correlation_id=correlation_id,
+                resource=resource,
+                context=context,
+                payload={},
+            )
+        )
+        raise
 
     except Exception as exc:
         await app.runs.set_status(run.id, "failed", error=str(exc))
