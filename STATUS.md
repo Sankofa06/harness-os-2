@@ -4,10 +4,28 @@ _Last updated: 2026-08-07_
 
 ## Current milestone
 Milestones 1 (kernel), 2 (control plane), 3 (language compute), 4 (execution),
-and 5 (agent runtime) are all fully done. Milestone 6 (MCP + Skills) is in
-progress: MCP-001 (lazy MCP index), MCP-002 (capabilities.search +
-activation), and SKL-001 (Skills) are all done — see the notes below. Next up
-in Milestone 6 is SKL-002 (Superpower bundles).
+5 (agent runtime), and 6 (MCP + Skills — MCP-001, MCP-002, SKL-001, SKL-002)
+are all fully done — see the notes below for the MCP/Skills work. Next up is
+Milestone 7 (Creative compute), starting with CRE-001 (Stability Matrix
+discovery).
+
+SKL-002: `harness.skills.superpowers.BUNDLES` declares the seven seed
+bundles (Coding, Git/GitHub, Browser, Creative, Research, Remote Host,
+Benchmarking) as fixed data mapping each to real native-tool names;
+`superpower_toggles` persists only each bundle's on/off state (default
+disabled). `GET /superpowers` lists all seven with membership + enabled
+state; `PUT /superpowers/{id}` toggles one. A toggle changes exactly one
+thing — whether that bundle's tools appear as `capabilities.search`
+candidates — and nothing else: `GET /tools` always lists everything
+registered, `POST /tools/{name}/run` never refuses a call for exposure
+reasons, and `PermissionPolicyRepo` is untouched. Proven directly: toggling
+`coding` on/off flips `shell_exec`'s presence in `capabilities.search`
+results while `GET /tools` and `GET /permissions/policies` stay unchanged
+throughout, and calling a currently-hidden tool still reaches its real
+handler. Browser/Creative/Research/Benchmarking bundles are honestly empty
+today — no native tools exist yet for those subsystems. See D-043 (which
+also covers a same-pass fix to a latent `ToolRunRepo.list()` ordering bug
+this milestone's tests exposed).
 
 SKL-001: `skills` (metadata + lazy `body`) and `skill_activations`
 (session_id, skill_id) tables mirror MCP-001/MCP-002's compact-index/lazy-body
@@ -207,8 +225,9 @@ from persisted Runs/ToolRuns on every request rather than a separately
 maintained structure, so it can't drift from what actually happened.
 
 ## Active task
-MCP-001, MCP-002, and SKL-001 are all done (see Current milestone above).
-Next per `TASKS.md` is SKL-002 (Superpower bundles).
+Milestone 6 (MCP + Skills) is fully done (see Current milestone above). Next
+per `TASKS.md` is CRE-001 (Stability Matrix discovery), starting Milestone 7
+(Creative compute).
 
 ## Completed milestones
 - Phase 1: full spec-kit reading pass (all `SPEC/`, `ADR/`, `BUILD/`, `TESTING/`,
@@ -266,7 +285,7 @@ asyncio interaction, not an application bug.
 None.
 
 ## Architectural decisions made during implementation
-See `DECISIONS.md` for the full list (D-001 through D-042). Notable ones affecting
+See `DECISIONS.md` for the full list (D-001 through D-043). Notable ones affecting
 what's built so far:
 - D-003/D-004: SQLAlchemy async + plain SQL migrations, schema grows incrementally
   per subsystem milestone rather than all at once.
@@ -281,13 +300,12 @@ what's built so far:
 - D-014: license selection is deferred to the project owner (placeholder in place).
 
 ## What is NOT yet built
-superpower bundles (SKL-002), creative compute, analytics/benchmarks, the
-Node daemon, the rest of the WebUI (graph/compute/models/creative/assets/
-analytics/approvals views, full three-panel IA, context meter, accessibility
-audit), TUI feature completion, demo mode content, screenshot automation,
-GitHub Pages site, and marketing copy. These are tracked as their own
-`TASKS.md` entries and proceed in dependency order per
-`BUILD/IMPLEMENTATION_PLAN.md`.
+creative compute, analytics/benchmarks, the Node daemon, the rest of the
+WebUI (graph/compute/models/creative/assets/analytics/approvals views, full
+three-panel IA, context meter, accessibility audit), TUI feature completion,
+demo mode content, screenshot automation, GitHub Pages site, and marketing
+copy. These are tracked as their own `TASKS.md` entries and proceed in
+dependency order per `BUILD/IMPLEMENTATION_PLAN.md`.
 
 ## Exact commands to run the currently working application
 
@@ -316,7 +334,7 @@ HARNESS_DEMO_MODE=1 uv run harness serve
 
 Test suites:
 ```bash
-uv run pytest tests -q                      # backend: 298 tests
+uv run pytest tests -q                      # backend: 306 tests
 cd web && npm run test                      # web unit: vitest
 cd web && npx playwright test               # web e2e (needs both servers running)
 ```

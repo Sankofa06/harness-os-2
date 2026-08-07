@@ -50,7 +50,7 @@ class ToolRunRepo:
             params["session_id"] = session_id
         where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
         rows = await self._db.fetch_all(
-            f"SELECT * FROM tool_runs{where} ORDER BY created_at DESC", params
+            f"SELECT * FROM tool_runs{where} ORDER BY created_at DESC, rowid DESC", params
         )
         return [_tool_run(r) for r in rows]
 

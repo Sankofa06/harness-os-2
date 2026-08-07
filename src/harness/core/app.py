@@ -49,6 +49,7 @@ from harness.persistence.repos_mcp import McpIndexRepo, McpServerRepo
 from harness.persistence.repos_model_instances import ModelInstanceRepo
 from harness.persistence.repos_permissions import PermissionDecisionRepo, PermissionPolicyRepo
 from harness.persistence.repos_skills import SkillActivationRepo, SkillRepo
+from harness.persistence.repos_superpowers import SuperpowerRepo
 from harness.persistence.repos_tools import ToolRunRepo
 from harness.persistence.repos_workspaces import WorkspaceRepo
 from harness.providers.language.base import LanguageProvider
@@ -105,6 +106,7 @@ class Application:
     session_capabilities: SessionCapabilityRepo
     skills: SkillRepo
     skill_activations: SkillActivationRepo
+    superpowers: SuperpowerRepo
     compiler: ContextCompiler
     api_token: str
     system_binding: Binding = field(default_factory=lambda: SYSTEM_DEFAULT_BINDING)
@@ -207,7 +209,8 @@ async def create_application(config: HarnessConfig | None = None) -> Application
     session_capabilities = SessionCapabilityRepo(db)
     skills = SkillRepo(db)
     skill_activations = SkillActivationRepo(db)
-    register_capabilities_search_tool(tools, mcp_index, skills)
+    superpowers = SuperpowerRepo(db)
+    register_capabilities_search_tool(tools, mcp_index, skills, superpowers)
     register_tools_describe_tool(tools, tools, mcp_index, session_capabilities)
     register_skills_activate_tool(tools, skills, skill_activations)
 
@@ -250,6 +253,7 @@ async def create_application(config: HarnessConfig | None = None) -> Application
         session_capabilities=session_capabilities,
         skills=skills,
         skill_activations=skill_activations,
+        superpowers=superpowers,
         compiler=compiler,
         api_token=token,
     )

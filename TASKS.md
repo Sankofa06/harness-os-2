@@ -344,7 +344,7 @@ Task format: ID — title / description / deps / components / acceptance / tests
 - Desc: seed bundles (Coding, Git/GitHub, Browser, Creative, Research, Remote Host, Benchmarking) as capability-exposure toggles; permissions stay explicit.
 - Deps: SKL-001, PERM-001. Components: skills, tools.
 - Acceptance: toggles modify exposed surface only.
-- Tests: integration exposure tests. Status: TODO
+- Tests: integration exposure tests. Status: DONE
 
 ---
 

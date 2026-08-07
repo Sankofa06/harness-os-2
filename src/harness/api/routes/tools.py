@@ -37,6 +37,11 @@ class ToolInfo(BaseModel):
 
 @router.get("/tools")
 async def list_tools(request: Request) -> list[ToolInfo]:
+    """The full registered tool catalog for management/administration —
+    unaffected by superpower bundle toggles (SKL-002), which gate only the
+    model-facing discovery surface (`capabilities.search`), not this
+    admin-facing listing.
+    """
     return [
         ToolInfo(
             name=t.name,

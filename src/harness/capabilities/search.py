@@ -6,6 +6,11 @@ token cost, trust class). Tool/MCP schemas are fetched separately via
 `tools.describe`; skill bodies via `skills.activate`
 (`harness.skills.activation`) — both of which also "activate" the candidate
 for that session's context.
+
+Native-tool candidates are additionally filtered through SKL-002's superpower
+bundle toggles — a tool gated behind a disabled bundle simply doesn't appear
+here, though it remains directly callable and fully visible in the
+admin-facing `GET /tools` listing ("toggles modify exposed surface only").
 """
 
 from __future__ import annotations
@@ -18,6 +23,8 @@ from harness.context.tokens import HeuristicEstimator
 from harness.core.domain import PermissionClass
 from harness.persistence.repos_mcp import McpIndexRepo
 from harness.persistence.repos_skills import SkillRepo
+from harness.persistence.repos_superpowers import SuperpowerRepo
+from harness.skills.superpowers import exposed_tool_names
 from harness.tools.base import ToolDefinition
 from harness.tools.registry import ToolRegistry
 
@@ -50,18 +57,29 @@ def _matches(query_terms: list[str], *fields: str) -> bool:
 
 
 async def search_capabilities(
-    query: str, tools: ToolRegistry, mcp_index: McpIndexRepo, skills: SkillRepo
+    query: str,
+    tools: ToolRegistry,
+    mcp_index: McpIndexRepo,
+    skills: SkillRepo,
+    exposed: set[str] | None = None,
 ) -> list[CapabilityCandidate]:
     """Plain case-insensitive substring matching against name + description —
     no ranking model, consistent with the rest of this codebase's rule of
     declaring exactly the capability that's real rather than approximating a
     fancier one. An empty query matches everything (browse-all).
+
+    ``exposed``, when given, additionally restricts native-tool candidates to
+    that name set (SKL-002's superpower-bundle exposure); ``None`` means no
+    gating, which is what a caller with no bundle state (e.g. a unit test)
+    should pass.
     """
     terms = [t for t in query.lower().split() if t]
     candidates: list[CapabilityCandidate] = []
 
     for tool in tools.list():
         if tool.name in _EXCLUDED_NATIVE_TOOLS:
+            continue
+        if exposed is not None and tool.name not in exposed:
             continue
         if terms and not _matches(terms, tool.name, tool.description):
             continue
@@ -109,10 +127,16 @@ async def search_capabilities(
 
 
 def register_capabilities_search_tool(
-    registry: ToolRegistry, mcp_index: McpIndexRepo, skills: SkillRepo
+    registry: ToolRegistry,
+    mcp_index: McpIndexRepo,
+    skills: SkillRepo,
+    superpowers: SuperpowerRepo,
 ) -> None:
     async def handler(arguments: dict[str, Any]) -> dict[str, Any]:
-        candidates = await search_capabilities(str(arguments["query"]), registry, mcp_index, skills)
+        exposed = exposed_tool_names(registry, await superpowers.enabled_ids())
+        candidates = await search_capabilities(
+            str(arguments["query"]), registry, mcp_index, skills, exposed
+        )
         return {"candidates": [c.model_dump() for c in candidates]}
 
     registry.register(

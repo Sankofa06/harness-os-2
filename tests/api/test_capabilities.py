@@ -31,7 +31,7 @@ async def _run_tool(client, tool_name: str, arguments: dict) -> dict:
     job = await _wait_for_job(client, resp.json()["id"])
     assert job["status"] == "succeeded", job
     runs = await client.get("/api/v1/tools/runs", params={"tool_name": tool_name})
-    return runs.json()[-1]["result"]
+    return runs.json()[0]["result"]  # most-recent-first (ORDER BY created_at DESC)
 
 
 @pytest.fixture
@@ -123,8 +123,8 @@ async def test_describe_unknown_native_tool_fails_the_tool_run(client) -> None:
     job = await _wait_for_job(client, resp.json()["id"])
     assert job["status"] == "succeeded"
     runs = await client.get("/api/v1/tools/runs", params={"tool_name": "tools.describe"})
-    assert runs.json()[-1]["status"] == "failed"
-    assert "not found" in runs.json()[-1]["error"]
+    assert runs.json()[0]["status"] == "failed"
+    assert "not found" in runs.json()[0]["error"]
 
 
 async def _create_contact_and_session(client) -> str:

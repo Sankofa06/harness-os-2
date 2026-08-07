@@ -29,7 +29,7 @@ async def _run_tool(client, tool_name: str, arguments: dict) -> dict:
     job = await _wait_for_job(client, resp.json()["id"])
     assert job["status"] == "succeeded", job
     runs = await client.get("/api/v1/tools/runs", params={"tool_name": tool_name})
-    return runs.json()[-1]["result"]
+    return runs.json()[0]["result"]  # most-recent-first (ORDER BY created_at DESC)
 
 
 _SKILL_BODY = (

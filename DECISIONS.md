@@ -761,3 +761,40 @@ Format: decision / reason / alternatives / consequences.
   — nothing yet checks that a session's contact actually has those
   capabilities available before activating; add that check if a real
   workflow needs it enforced rather than advisory.
+
+## D-043 — Superpower toggles gate `capabilities.search` only, never `GET /tools` or execution
+- Decision: SKL-002's seven seed bundles (Coding, Git/GitHub, Browser,
+  Creative, Research, Remote Host, Benchmarking — `harness.skills.
+  superpowers.BUNDLES`) are fixed declarative data mapping each bundle to the
+  real native-tool names it bundles; a bundle's on/off state is the only
+  thing persisted (`superpower_toggles`, default disabled). Toggling a
+  bundle changes exactly one thing: whether its member tools appear as
+  `capabilities.search` candidates. It does **not** filter the admin-facing
+  `GET /tools` listing (tried first, then reverted — `tests/api/
+  test_workspace_tools.py::test_list_tools_includes_all_workspace_tools`
+  already asserts every workspace tool always appears there, an established
+  contract this shouldn't silently break), does not block `POST /tools/
+  {name}/run` (a gated-but-disabled tool remains fully callable — proven by
+  calling `fs_list_dir` with a bogus workspace id while its bundle is off and
+  observing the call reach real TOOL-002 machinery, not an "unexposed"
+  rejection), and does not touch `PermissionPolicyRepo` at all (proven by
+  diffing `GET /permissions/policies` before/after toggling). This is the
+  literal reading of "toggles modify exposed surface only" and "permissions
+  remain explicit."
+- Reason: `GET /tools` is an established, tested administrative contract
+  (list everything registered, for management/permissions UI); conflating it
+  with the model-facing discovery surface would have silently broken that
+  contract for no spec-mandated reason. Keeping exposure gating scoped to
+  `capabilities.search` alone keeps the blast radius of "what a toggle
+  affects" exactly matching the DoD bullet's wording.
+- Consequences: Browser/Creative/Research/Benchmarking bundles are currently
+  empty (no native tools exist for those subsystems yet) — toggling them on
+  has no visible effect today; they'll gain real membership as CRE-*/BENCH-*
+  tools land in later milestones. Discovered and fixed in the same pass: a
+  pre-existing latent ordering bug in `ToolRunRepo.list()` (`ORDER BY
+  created_at DESC` with no tiebreaker — SQLite's `datetime('now')` has only
+  1-second resolution, so two tool runs in the same test could tie and sort
+  unpredictably) that this milestone's own tests were the first to make two
+  same-second calls to the same tool and actually observe; fixed by adding
+  `, rowid DESC` as a tiebreaker, matching the pattern `MessageRepo` already
+  used for the same reason.
