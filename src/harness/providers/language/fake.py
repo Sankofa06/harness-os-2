@@ -10,14 +10,17 @@ from __future__ import annotations
 import asyncio
 import hashlib
 from collections.abc import AsyncIterator
+from typing import Any
 
 from harness.core.capabilities import AdapterLevel
+from harness.core.errors import NotFoundError
 from harness.providers.language.base import (
     ChatRequest,
     ChatStreamItem,
     ChatUsage,
     LanguageProvider,
     ModelInfo,
+    ModelInstance,
 )
 
 _MODELS = [
@@ -55,12 +58,26 @@ class FakeProvider(LanguageProvider):
                 AdapterLevel.L0_CHAT,
                 AdapterLevel.L1_TOOLS,
                 AdapterLevel.L2_RUNTIME,
+                AdapterLevel.L3_LIFECYCLE,
                 AdapterLevel.L4_TELEMETRY,
             }
         )
 
     async def list_models(self) -> list[ModelInfo]:
         return list(_MODELS)
+
+    async def load_model(self, model_id: str, **options: Any) -> ModelInstance:
+        if model_id not in {m.id for m in _MODELS}:
+            raise NotFoundError(f"unknown fake model: {model_id}")
+        return ModelInstance(
+            instance_id=f"{model_id}:fake",
+            model_id=model_id,
+            status="loaded",
+            load_time_seconds=0.0,
+        )
+
+    async def unload_model(self, instance_id: str) -> None:
+        return None
 
     async def chat_stream(self, request: ChatRequest) -> AsyncIterator[ChatStreamItem]:
         last_user = next((m.content for m in reversed(request.messages) if m.role == "user"), "")

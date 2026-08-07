@@ -192,3 +192,26 @@ Format: decision / reason / alternatives / consequences.
   three-value sets chosen (`manual`/`always_loaded`/`on_demand` and
   `inherit`/`disabled`/`required`) are this implementation's minimal reasonable set,
   documented here since the spec doesn't pin them down.
+
+## D-020 — Adapter `provider_id` is overridden to the persisted `ProviderConfig.id` at construction
+- Decision: `build_provider()` (LP-009) constructs the adapter matching
+  `ProviderConfig.type`, resolves its secret just-in-time via `SecretStore`, then sets
+  `provider.provider_id = config.id` and `provider.display_name = config.display_name`
+  before registering it in the live `ProviderRegistry` — overriding the adapter
+  class's fixed default (e.g. `AnthropicProvider.provider_id == "anthropic"`).
+  `Application.get_or_build_provider()` is the single entry point: check the registry
+  first, build-and-register on a cache miss.
+- Reason: the registry is keyed by `provider_id`; if every Anthropic adapter kept the
+  class-level `"anthropic"` id, a user configuring two Anthropic accounts (or two
+  OpenAI-compatible endpoints) would have the second overwrite the first in the
+  registry. Keying by the persisted config's own opaque id makes every configured
+  provider addressable independently, matching CP-003's "persisted configuration
+  distinct from the in-memory adapter registry."
+- Consequences: `Binding.provider` (used throughout the run loop, SPEC/ARCHITECTURE.md
+  binding precedence) now refers to a `ProviderConfig.id`, not a fixed adapter-type
+  string, for anything beyond the built-in `"fake"` provider (which stays registered
+  under its literal id with no backing `ProviderConfig` row, so the system works with
+  zero configuration per D-010). `/language/models`, `/language/instances/load`, and
+  `/language/instances/{id}/unload` all run through this same lazy-build path, and a
+  single provider failing model discovery doesn't fail the whole `/language/models`
+  aggregation (SPEC/ARCHITECTURE.md failure-isolation).

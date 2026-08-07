@@ -18,6 +18,7 @@ from harness.context.compiler import ContextCompiler
 from harness.context.tokens import HeuristicEstimator
 from harness.core.config import HarnessConfig
 from harness.core.domain import Binding
+from harness.core.errors import NotFoundError
 from harness.core.secrets import SecretStore
 from harness.events.bus import EventBus
 from harness.events.model import Event
@@ -36,6 +37,9 @@ from harness.persistence.repos import (
 )
 from harness.persistence.repos_control_plane import HostRepo, ModelProfileRepo, ProviderConfigRepo
 from harness.persistence.repos_jobs import JobRepo
+from harness.persistence.repos_model_instances import ModelInstanceRepo
+from harness.providers.language.base import LanguageProvider
+from harness.providers.language.factory import build_provider
 from harness.providers.language.fake import FakeProvider
 from harness.providers.language.registry import ProviderRegistry
 
@@ -64,6 +68,7 @@ class Application:
     provider_configs: ProviderConfigRepo
     hosts: HostRepo
     model_profiles: ModelProfileRepo
+    model_instances: ModelInstanceRepo
     providers: ProviderRegistry
     compiler: ContextCompiler
     api_token: str
@@ -71,6 +76,24 @@ class Application:
 
     async def publish(self, event: Event) -> Event:
         return await self.bus.publish(event)
+
+    async def get_or_build_provider(self, provider_config_id: str) -> LanguageProvider:
+        """Return the live adapter for a persisted provider config, building and
+        registering it on first use. Secrets are resolved just-in-time, never cached
+        in a form callers could read back (SPEC/SECURITY_PRIVACY.md).
+        """
+        try:
+            return self.providers.get(provider_config_id)
+        except NotFoundError:
+            pass
+        config = await self.provider_configs.get(provider_config_id)
+        secret_value = None
+        if config.secret_ref_id:
+            secret_ref = await self.secret_refs.get(config.secret_ref_id)
+            secret_value = self.secret_store.get(secret_ref.kind, secret_ref.target)
+        provider = build_provider(config, secret_value)
+        self.providers.register(provider)
+        return provider
 
     async def close(self) -> None:
         await self.db.close()
@@ -122,6 +145,7 @@ async def create_application(config: HarnessConfig | None = None) -> Application
     provider_configs = ProviderConfigRepo(db)
     hosts = HostRepo(db)
     model_profiles = ModelProfileRepo(db)
+    model_instances = ModelInstanceRepo(db)
 
     await seed_agents(roles, personas)
 
@@ -149,6 +173,7 @@ async def create_application(config: HarnessConfig | None = None) -> Application
         provider_configs=provider_configs,
         hosts=hosts,
         model_profiles=model_profiles,
+        model_instances=model_instances,
         providers=providers,
         compiler=compiler,
         api_token=token,

@@ -28,6 +28,8 @@ from harness.providers.language.base import (
 )
 from harness.providers.language.openai_compat import OpenAICompatibleProvider
 
+DEFAULT_BASE_URL = "http://127.0.0.1:1234"
+
 
 class LMStudioProvider(LanguageProvider):
     provider_id = "lmstudio"
@@ -35,7 +37,7 @@ class LMStudioProvider(LanguageProvider):
 
     def __init__(
         self,
-        base_url: str = "http://127.0.0.1:1234",
+        base_url: str = DEFAULT_BASE_URL,
         *,
         api_key: str | None = None,
         http_client: httpx.AsyncClient | None = None,

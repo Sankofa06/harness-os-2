@@ -27,6 +27,8 @@ from harness.providers.language.base import (
     ModelInstance,
 )
 
+DEFAULT_BASE_URL = "http://127.0.0.1:11434"
+
 
 class OllamaProvider(LanguageProvider):
     provider_id = "ollama"
@@ -34,7 +36,7 @@ class OllamaProvider(LanguageProvider):
 
     def __init__(
         self,
-        base_url: str = "http://127.0.0.1:11434",
+        base_url: str = DEFAULT_BASE_URL,
         *,
         http_client: httpx.AsyncClient | None = None,
     ) -> None:

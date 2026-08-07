@@ -17,6 +17,7 @@ from harness.api.routes import (
     agents,
     events,
     hosts,
+    instances,
     jobs,
     model_profiles,
     providers,
@@ -88,5 +89,6 @@ def create_app(
     app.include_router(providers.router, prefix=API_PREFIX)
     app.include_router(hosts.router, prefix=API_PREFIX)
     app.include_router(model_profiles.router, prefix=API_PREFIX)
+    app.include_router(instances.router, prefix=API_PREFIX)
 
     return app

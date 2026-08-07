@@ -61,6 +61,25 @@ PlacementPolicy = Literal[
 ToolCapabilityPolicy = Literal["inherit", "disabled", "required"]
 
 
+InstanceStatus = Literal["loading", "loaded", "unloading", "unloaded", "failed"]
+
+
+class ModelInstanceRecord(BaseModel):
+    """Persisted lifecycle record for a loaded model (LP-009).
+
+    Distinct from ``providers.language.base.ModelInstance``, which is an adapter's
+    raw load-call return value; this is Harness's durable view of it.
+    """
+
+    id: str
+    provider_config_id: str
+    model_id: str
+    native_instance_id: str | None = None
+    status: InstanceStatus = "loading"
+    settings: dict[str, Any] = Field(default_factory=dict)
+    error: str | None = None
+
+
 class ModelProfile(BaseModel):
     """A reusable provider+model+settings+policy bundle (SPEC/PROVIDER_MATRIX.md)."""
 

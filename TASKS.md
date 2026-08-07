@@ -194,7 +194,7 @@ Task format: ID — title / description / deps / components / acceptance / tests
 - Desc: `/language/models*`, `/language/instances*` incl. load/unload/settings-schema/settings; long ops as Jobs.
 - Deps: LP-004, JOB-001. Components: api, providers.
 - Acceptance: lifecycle endpoints work against LM Studio/Ollama fixtures.
-- Tests: API integration. Status: TODO
+- Tests: API integration. Status: DONE
 
 ---
 
