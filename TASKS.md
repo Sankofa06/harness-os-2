@@ -222,7 +222,7 @@ Task format: ID — title / description / deps / components / acceptance / tests
 - Desc: `/workspaces/{id}/git/*`: init/status/diff/add/commit/branch/log via structured exec.
 - Deps: WSP-001. Components: workspaces.
 - Acceptance: init/use git remotely; diff renders.
-- Tests: integration vs fixture repo. Status: TODO
+- Tests: integration vs fixture repo. Status: DONE
 
 ### TOOL-001 Tool registry + lifecycle
 - Desc: native tool registry, typed schemas, lifecycle per SPEC/MCP_SKILLS_TOOLS.md (validate→permission→approve→execute→capture→artifact→events→compact result).

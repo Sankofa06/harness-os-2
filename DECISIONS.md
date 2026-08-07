@@ -332,3 +332,26 @@ Format: decision / reason / alternatives / consequences.
   step "see diffs" unimplementable until a later milestone for no real benefit.
 - Consequences: WSP-002 reuses this same `exec_stream`-based pattern for its own
   git subcommands rather than introducing a second git-invocation helper.
+
+## D-027 — Git subcommand results distinguish "failed" from "errored"
+- Decision: WSP-002's `/workspaces/{id}/git/*` endpoints run every git subcommand
+  through one shared `_run_git()` helper that never raises on a nonzero exit — it
+  returns `(exit_status, stdout, stderr)` and each endpoint decides what a failure
+  means. `git commit` with nothing staged (or no author identity configured)
+  returns HTTP 200 with `{"ok": false, "output": ...}`; `git init`/`add`/`branch`
+  raise `ProviderError` (502) on a nonzero exit, since those have no legitimate
+  "expected to fail" case the way an empty commit does. `git status`/`log` report
+  `is_git_repo: false` / `[]` rather than erroring when the workspace isn't a repo
+  yet or has no commits.
+- Reason: "nothing to commit" is a routine, expected outcome of calling `git commit`
+  in normal use (e.g. an agent re-running a commit step after a prior run already
+  committed the same changes) — treating it as a 5xx would make ordinary polling/
+  retry flows look like server errors. `git init` failing, by contrast, means
+  something is actually wrong (permissions, disk, not a valid path) and should
+  surface as an error. Test coverage
+  (`test_git_commit_with_nothing_staged_reports_failure_not_error`,
+  tests/api/test_workspaces_git.py) pins this distinction against a real git commit
+  invocation, not just an assumption about git's exit codes.
+- Consequences: any future git subcommand endpoint must decide, case by case,
+  whether its failure modes are "normal, report as ok:false" or "abnormal, raise" —
+  there's no blanket rule the router applies automatically.

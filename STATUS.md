@@ -17,19 +17,22 @@ path, closing the gap where a symlink inside an allowed root points outside it.
 Fails closed with no roots configured. Proven with real filesystem symlinks and
 traversal attempts in tests, not just lexical assertions.
 
-WSP-001 (Workspaces) is also done: a `workspaces` table pins a folder on a Host;
-`/hosts/{id}/workspaces/browse` and `.../create-folder` let a caller pick/create a
-folder before a Workspace exists; `/workspaces*` gives CRUD plus `tree` (SFTP list),
-`file` (read/write), and `diff` (real `git diff`, reporting `is_git_repo: false`
-rather than erroring when the folder isn't a Git repo yet — WSP-002 owns the rest of
-git). Every path a caller supplies passes through two containment layers: the Host's
-own `workspace_roots` (HOST-002, inside `SSHHost`) and — narrower — the Workspace's
-own `root_path`, so one Workspace can't read/write into a sibling Workspace on the
-same Host even when the Host's configured roots are broader than either Workspace.
+WSP-001 (Workspaces) and WSP-002 (Git operations) are also done. A `workspaces`
+table pins a folder on a Host; `/hosts/{id}/workspaces/browse` and `.../create-
+folder` let a caller pick/create a folder before a Workspace exists; `/workspaces*`
+gives CRUD plus `tree` (SFTP list) and `file` (read/write). Every path a caller
+supplies passes through two containment layers: the Host's own `workspace_roots`
+(HOST-002, inside `SSHHost`) and — narrower — the Workspace's own `root_path`, so
+one Workspace can't read/write into a sibling Workspace on the same Host even when
+the Host's configured roots are broader than either Workspace. `/workspaces/{id}/
+git/*` (init/status/diff/add/commit/branch/log) runs real git remotely via the same
+structured-argv `exec_stream` HOST-001 established — never shell-interpolated —
+returning `is_git_repo: false` rather than erroring when a folder isn't a repo yet,
+and reporting a failed commit (e.g. nothing staged) as `{"ok": false, ...}` rather
+than a 5xx.
 
 ## Active task
-None in flight. Next up per `TASKS.md`: WSP-002 (Git operations — init/status/add/
-commit/branch/log via structured exec, building on WSP-001's diff).
+None in flight. Next up per `TASKS.md`: TOOL-001 (Tool registry + lifecycle).
 
 ## Completed milestones
 - Phase 1: full spec-kit reading pass (all `SPEC/`, `ADR/`, `BUILD/`, `TESTING/`,
@@ -73,7 +76,7 @@ commit/branch/log via structured exec, building on WSP-001's diff).
   SPEC/HOSTS_AND_NODE.md, `host_capabilities` table).
 
 ## Known failures
-None functionally. 187/187 backend tests pass, 2/2 web unit tests pass, 1/1 Playwright
+None functionally. 192/192 backend tests pass, 2/2 web unit tests pass, 1/1 Playwright
 e2e test passes. `ruff check`, `ruff format --check`, and `mypy --strict` are clean on
 `src/harness`. `eslint`, `vitest`, and `tsc -b && vite build` are clean on `web/`.
 Cosmetic: some test runs emit a `PytestUnhandledThreadExceptionWarning` from an
@@ -85,7 +88,7 @@ asyncio interaction, not an application bug.
 None.
 
 ## Architectural decisions made during implementation
-See `DECISIONS.md` for the full list (D-001 through D-026). Notable ones affecting
+See `DECISIONS.md` for the full list (D-001 through D-027). Notable ones affecting
 what's built so far:
 - D-003/D-004: SQLAlchemy async + plain SQL migrations, schema grows incrementally
   per subsystem milestone rather than all at once.
@@ -100,9 +103,8 @@ what's built so far:
 - D-014: license selection is deferred to the project owner (placeholder in place).
 
 ## What is NOT yet built
-WSP-002's full git subcommand surface (init/status/add/commit/branch/log — only
-`diff`, via WSP-001, exists so far), the Tool registry/lifecycle and permission
-engine (TOOL-001/002, PERM-001), Artifacts (ART-001), MCP/skills, creative compute,
+The Tool registry/lifecycle and permission engine (TOOL-001/002, PERM-001),
+Artifacts (ART-001), MCP/skills, creative compute,
 analytics/benchmarks, the Node daemon, the rest of the WebUI (graph/compute/models/
 creative/assets/analytics/approvals views, full three-panel IA, context meter,
 accessibility audit), TUI feature completion, demo mode content, screenshot
@@ -136,7 +138,7 @@ HARNESS_DEMO_MODE=1 uv run harness serve
 
 Test suites:
 ```bash
-uv run pytest tests -q                      # backend: 187 tests
+uv run pytest tests -q                      # backend: 192 tests
 cd web && npm run test                      # web unit: vitest
 cd web && npx playwright test               # web e2e (needs both servers running)
 ```
