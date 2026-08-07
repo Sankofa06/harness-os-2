@@ -304,7 +304,7 @@ Task format: ID — title / description / deps / components / acceptance / tests
 - Desc: `agents.delegate` tool, agent.spawned/completed events, `GET /sessions/{id}/graph` (nodes: user/orchestrator/contacts/jobs/tools; edges: delegation/handoff; statuses).
 - Deps: AGT-005, TOOL-001. Components: agents, api.
 - Acceptance: parallel plan→review→implement workflow runs; graph reflects it.
-- Tests: multi-contact integration test. Status: TODO
+- Tests: multi-contact integration test. Status: DONE
 
 ### AGT-007 Stop/cancel
 - Desc: `POST /sessions/{id}/stop` cancels active runs/jobs cleanly.

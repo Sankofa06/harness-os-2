@@ -221,6 +221,10 @@ class Run(BaseModel):
     status: RunStatus = "queued"
     binding_snapshot_id: str | None = None
     correlation_id: str | None = None
+    # Set when this Run was created by another Run's `agents.delegate` tool call
+    # rather than a direct @mention (AGT-006) — the edge a session's orchestration
+    # graph draws between the delegating and delegated Runs.
+    parent_run_id: str | None = None
     error: str | None = None
     started_at: str | None = None
     finished_at: str | None = None

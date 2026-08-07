@@ -616,3 +616,54 @@ Format: decision / reason / alternatives / consequences.
   letting one canceled contact's exception propagate and abort collecting the
   others' outcomes) so a partial `/stop` mid-fan-out still returns a coherent
   response listing every contact's actual outcome, canceled or not.
+
+## D-038 — `agents.delegate` is a real Tool that spawns a real Run, not a separate delegation pipeline
+- Decision: `agents.delegate` (AGT-006) is registered in the same `ToolRegistry`
+  as every TOOL-001/002 tool, runs through the same `ToolExecutor` lifecycle and
+  `PermissionEngine`, and its handler calls `harness.agents.runloop.run_contact`
+  directly — the exact function a direct `@mention` uses — rather than a parallel
+  "delegation execution path" with its own binding resolution, context
+  compilation, and event handling. `Run` gained `parent_run_id` (nullable, set
+  only for delegated runs) so a delegation is representable as an ordinary Run
+  with a pointer to the Run that spawned it, not a new domain concept.
+- Reason: SPEC/CONTEXT_COMPILER.md lists `agents.delegate` alongside
+  `capabilities.search`/`skills.activate`/`tools.describe`/`artifacts.get` as one
+  of the always-visible meta-capabilities — i.e. it's meant to be *just another
+  tool call* from the calling contact's perspective, not a distinct subsystem.
+  Reusing `run_contact` means a delegated contact gets identical binding
+  precedence, context budgeting, and streaming behavior to a directly-mentioned
+  one — there is exactly one code path that runs a contact, so a future change to
+  that path (e.g. wiring in real model-driven tool-calling) automatically applies
+  to delegated runs too, with nothing delegation-specific to keep in sync.
+- Consequences: delegation requires a real `parent_run_id` argument (the
+  delegating contact's own already-created Run) rather than inferring "who is
+  delegating" implicitly — this is honest about what Harness actually knows
+  (which Run's tool call this is) and avoids guessing at caller identity from
+  ambient context. `agents.delegate`'s handler does a local `from harness.agents.
+  runloop import run_contact` inside the closure rather than a module-level
+  import, and `register_delegation_tool` itself takes `Application` only under
+  `TYPE_CHECKING` — both exist to break a real import cycle: `core.app` must
+  import `agents.delegate_tool` to register the tool, but `agents.runloop` (and
+  by extension anything importing `Application` at module scope) can't be
+  imported back from a module `core.app` itself imports at load time.
+
+## D-039 — The session graph is recomputed from Runs/ToolRuns, never stored
+- Decision: `GET /sessions/{id}/graph` (AGT-006) has no graph table of its own —
+  `harness.agents.graph.build_session_graph` reconstructs nodes and edges fresh
+  from `RunRepo.list_for_session` (using each Run's `parent_run_id` for
+  delegation edges, and the absence of one for a direct-@mention `message` edge
+  to the implicit `user` node) and `ToolRunRepo.list(session_id=...)` (one `tool`
+  node per tool invocation) on every request.
+- Reason: a separately maintained graph structure can drift from what actually
+  happened — every write path would need to remember to also update the graph,
+  and nothing enforces that. Runs and ToolRuns are already the durable source of
+  truth for "what ran and in what order"; deriving the graph from them guarantees
+  it can never show something that didn't happen or omit something that did.
+  Node identity for contacts is the contact ID (`contact:<id>`), not the run ID,
+  so a contact who ran multiple times in one session collapses to one node with
+  several edges into it — matching SPEC's node vocabulary (user/orchestrator/
+  contacts/jobs/tools represent *entities*, not individual invocations).
+- Consequences: the graph endpoint's cost scales with a session's total Run/
+  ToolRun count (no pagination yet) — acceptable for now since sessions are
+  bounded by realistic conversation lengths; revisit if a session's graph ever
+  needs to represent an unbounded history.

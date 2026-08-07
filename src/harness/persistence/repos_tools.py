@@ -37,14 +37,21 @@ class ToolRunRepo:
             raise NotFoundError(f"tool run not found: {run_id}")
         return _tool_run(row)
 
-    async def list(self, *, tool_name: str | None = None) -> list[ToolRun]:
+    async def list(
+        self, *, tool_name: str | None = None, session_id: str | None = None
+    ) -> list[ToolRun]:
+        clauses = []
+        params: dict[str, Any] = {}
         if tool_name is not None:
-            rows = await self._db.fetch_all(
-                "SELECT * FROM tool_runs WHERE tool_name = :t ORDER BY created_at DESC",
-                {"t": tool_name},
-            )
-        else:
-            rows = await self._db.fetch_all("SELECT * FROM tool_runs ORDER BY created_at DESC")
+            clauses.append("tool_name = :tool_name")
+            params["tool_name"] = tool_name
+        if session_id is not None:
+            clauses.append("session_id = :session_id")
+            params["session_id"] = session_id
+        where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
+        rows = await self._db.fetch_all(
+            f"SELECT * FROM tool_runs{where} ORDER BY created_at DESC", params
+        )
         return [_tool_run(r) for r in rows]
 
     async def set_status(

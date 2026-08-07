@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from secrets import token_urlsafe
 
+from harness.agents.delegate_tool import register_delegation_tool
 from harness.agents.registry import RunRegistry
 from harness.agents.seeds import seed_agents
 from harness.artifacts.store import ArtifactBlobStore
@@ -193,7 +194,7 @@ async def create_application(config: HarnessConfig | None = None) -> Application
 
     compiler = ContextCompiler(HeuristicEstimator(), config.context)
 
-    return Application(
+    application = Application(
         config=config,
         db=db,
         bus=bus,
@@ -228,3 +229,8 @@ async def create_application(config: HarnessConfig | None = None) -> Application
         compiler=compiler,
         api_token=token,
     )
+    # Registered last: agents.delegate needs a fully-constructed Application to
+    # spawn real Runs through, so it can't be built alongside the other tools
+    # above (which only need the individual repos they close over).
+    register_delegation_tool(tools, application)
+    return application

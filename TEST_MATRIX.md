@@ -73,7 +73,7 @@ names; file paths may evolve. Status: PLANNED / IMPLEMENTED / PASSING.
 | Create Role/Persona/Contact/Team | `tests/api/test_agents_crud.py` | PASSING |
 | Mention one/many/team | `tests/unit/test_mentions.py`, `tests/api/test_run_loop.py` | PASSING |
 | Rebind global/session/turn + snapshots | `tests/unit/test_binding.py`, `tests/api/test_run_loop.py::test_session_binding_override_...` | PASSING |
-| Parallel plan→review→implement | `tests/integration/test_orchestration.py` | PLANNED (needs AGT-006 delegation) |
+| Parallel plan→review→implement; agents.delegate tool; agent.spawned/completed events; session graph reflects delegation | `tests/api/test_delegation.py` | PASSING |
 | Stop/cancel | `tests/api/test_stop.py`, `tests/unit/test_run_registry.py` | PASSING |
 
 ## MCP / skills / tools

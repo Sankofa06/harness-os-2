@@ -396,8 +396,9 @@ class RunRepo:
     async def create(self, run: Run) -> Run:
         await self._db.execute(
             "INSERT INTO runs (id, session_id, contact_id, message_id, status, "
-            "binding_snapshot_id, correlation_id) VALUES (:id, :session_id, :contact_id, "
-            ":message_id, :status, :binding_snapshot_id, :correlation_id)",
+            "binding_snapshot_id, correlation_id, parent_run_id) VALUES (:id, "
+            ":session_id, :contact_id, :message_id, :status, :binding_snapshot_id, "
+            ":correlation_id, :parent_run_id)",
             run.model_dump(exclude={"error", "started_at", "finished_at"}),
         )
         return run
@@ -406,18 +407,13 @@ class RunRepo:
         row = await self._db.fetch_one("SELECT * FROM runs WHERE id = :id", {"id": run_id})
         if row is None:
             raise NotFoundError(f"run not found: {run_id}")
-        return Run(
-            id=row["id"],
-            session_id=row["session_id"],
-            contact_id=row["contact_id"],
-            message_id=row["message_id"],
-            status=row["status"],
-            binding_snapshot_id=row["binding_snapshot_id"],
-            correlation_id=row["correlation_id"],
-            error=row["error"],
-            started_at=row["started_at"],
-            finished_at=row["finished_at"],
+        return _run(row)
+
+    async def list_for_session(self, session_id: str) -> list[Run]:
+        rows = await self._db.fetch_all(
+            "SELECT * FROM runs WHERE session_id = :id ORDER BY created_at", {"id": session_id}
         )
+        return [_run(r) for r in rows]
 
     async def set_status(
         self,
@@ -549,4 +545,20 @@ def _persona(row: Any) -> Persona:
         prompt=row["prompt"],
         precedence=row["precedence"],
         builtin=bool(row["builtin"]),
+    )
+
+
+def _run(row: Any) -> Run:
+    return Run(
+        id=row["id"],
+        session_id=row["session_id"],
+        contact_id=row["contact_id"],
+        message_id=row["message_id"],
+        status=row["status"],
+        binding_snapshot_id=row["binding_snapshot_id"],
+        correlation_id=row["correlation_id"],
+        parent_run_id=row["parent_run_id"],
+        error=row["error"],
+        started_at=row["started_at"],
+        finished_at=row["finished_at"],
     )

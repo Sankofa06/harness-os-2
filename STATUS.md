@@ -3,9 +3,11 @@
 _Last updated: 2026-08-07_
 
 ## Current milestone
-Milestones 1 (kernel), 2 (control plane), and 3 (language compute) are all fully
-done. Milestone 4 (execution) is in progress: HOST-001 (SSH agentless adapter) and
-HOST-002 (path safety) are done. `SSHHost` (asyncssh-based) does test-connection/
+Milestones 1 (kernel), 2 (control plane), 3 (language compute), 4 (execution),
+and 5 (agent runtime) are all fully done. See the end of this section (AGT-006)
+for the most recently completed work; Milestone 6 (MCP + Skills) is next.
+
+`SSHHost` (asyncssh-based) does test-connection/
 exec-stream/cancel/sftp read-write-list-move-delete against a real local SSH server
 in tests (not mocks), with explicit fingerprint pinning (no known_hosts file) and
 argv quoting (no shell injection, proven by a regression test). `POST /hosts/{id}/
@@ -134,9 +136,27 @@ message POST is started, allowed to begin streaming, and canceled mid-flight fro
 a second concurrent request on the same event loop — including that stopping one
 session's runs leaves a different session's concurrently-running one untouched.
 
+AGT-006 (Delegation + orchestration graph) is also done — this completes
+Milestone 5 (Agent runtime) in full. `agents.delegate` is a real, registered Tool
+(permission class `execute`, running through the same TOOL-001 lifecycle and
+PERM-001 permission engine as every other tool) that spawns a genuine new `Run`
+for the target contact via the same `run_contact()` the run loop itself uses —
+same binding resolution, same context compilation, same event trail — and blocks
+until that run finishes, returning its reply. `Run` gained a `parent_run_id`
+field recording which run (if any) delegated to it; `run_contact` publishes
+`agent.spawned` specifically for delegated runs (`agent.completed` already fired
+for every run). Because each `POST /tools/agents.delegate/run` call runs as its
+own Job/Task (TOOL-001), an orchestrator delegating to two contacts via two
+concurrent tool calls gets genuine parallel execution — the same concurrency
+AGT-007 established for @mention fan-out, proven directly with `asyncio.gather`
+over two real delegate calls. `GET /sessions/{id}/graph` reconstructs a session's
+orchestration graph (user/contact/tool nodes, message/delegation edges) fresh
+from persisted Runs/ToolRuns on every request rather than a separately
+maintained structure, so it can't drift from what actually happened.
+
 ## Active task
-None in flight. Remaining Milestone 5 work: AGT-006 (delegation/orchestration
-graph) — the last item in the milestone.
+None in flight. Milestone 5 (Agent runtime) is fully done. Next per `TASKS.md`
+is Milestone 6 (MCP + Skills).
 
 ## Completed milestones
 - Phase 1: full spec-kit reading pass (all `SPEC/`, `ADR/`, `BUILD/`, `TESTING/`,
@@ -180,7 +200,7 @@ graph) — the last item in the milestone.
   SPEC/HOSTS_AND_NODE.md, `host_capabilities` table).
 
 ## Known failures
-None functionally. 259/259 backend tests pass (repeatedly and reliably — see D-030
+None functionally. 265/265 backend tests pass (repeatedly and reliably — see D-030
 for a concurrency race that used to make some flaky before its fix), 2/2 web
 unit tests pass, 1/1 Playwright e2e test passes. `ruff check`, `ruff format --check`,
 and `mypy --strict` are clean on `src/harness`. `eslint`, `vitest`, and `tsc -b &&
@@ -194,7 +214,7 @@ asyncio interaction, not an application bug.
 None.
 
 ## Architectural decisions made during implementation
-See `DECISIONS.md` for the full list (D-001 through D-037). Notable ones affecting
+See `DECISIONS.md` for the full list (D-001 through D-039). Notable ones affecting
 what's built so far:
 - D-003/D-004: SQLAlchemy async + plain SQL migrations, schema grows incrementally
   per subsystem milestone rather than all at once.
@@ -209,7 +229,7 @@ what's built so far:
 - D-014: license selection is deferred to the project owner (placeholder in place).
 
 ## What is NOT yet built
-AGT-006 (delegation/orchestration graph), MCP/skills, creative compute,
+MCP/skills, creative compute,
 analytics/benchmarks, the Node daemon, the rest of the WebUI (graph/compute/models/
 creative/assets/analytics/approvals views, full three-panel IA, context meter,
 accessibility audit), TUI feature completion, demo mode content, screenshot
@@ -243,7 +263,7 @@ HARNESS_DEMO_MODE=1 uv run harness serve
 
 Test suites:
 ```bash
-uv run pytest tests -q                      # backend: 259 tests
+uv run pytest tests -q                      # backend: 265 tests
 cd web && npm run test                      # web unit: vitest
 cd web && npx playwright test               # web e2e (needs both servers running)
 ```

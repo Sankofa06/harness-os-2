@@ -77,7 +77,7 @@ async def handle_user_message(
     started: list[tuple[str, Contact, asyncio.Task[RunOutcome]]] = []
     for contact in targets:
         run_id = new_id("run")
-        task = asyncio.create_task(_run_contact(app, session_id, contact, correlation_id, run_id))
+        task = asyncio.create_task(run_contact(app, session_id, contact, correlation_id, run_id))
         app.run_registry.register(run_id, session_id, task)
         started.append((run_id, contact, task))
 
@@ -96,8 +96,14 @@ async def handle_user_message(
     return outcomes
 
 
-async def _run_contact(
-    app: Application, session_id: str, contact: Contact, correlation_id: str, run_id: str
+async def run_contact(
+    app: Application,
+    session_id: str,
+    contact: Contact,
+    correlation_id: str,
+    run_id: str,
+    *,
+    parent_run_id: str | None = None,
 ) -> RunOutcome:
     run = await app.runs.create(
         Run(
@@ -105,10 +111,30 @@ async def _run_contact(
             session_id=session_id,
             contact_id=contact.id,
             correlation_id=correlation_id,
+            parent_run_id=parent_run_id,
         )
     )
     resource = EventResource(type="run", id=run.id)
     context = {"session_id": session_id}
+
+    if parent_run_id is not None:
+        # AGT-006: a delegated run additionally announces itself as a spawn, so
+        # GET /sessions/{id}/graph and any UI watching agent.spawned/completed can
+        # distinguish "the orchestrator asked someone else to do this" from a
+        # direct @mention — run.started alone doesn't carry that distinction.
+        await app.publish(
+            Event(
+                type="agent.spawned",
+                correlation_id=correlation_id,
+                resource=resource,
+                context=context,
+                payload={
+                    "contact_id": contact.id,
+                    "handle": contact.handle,
+                    "parent_run_id": parent_run_id,
+                },
+            )
+        )
 
     await app.publish(
         Event(

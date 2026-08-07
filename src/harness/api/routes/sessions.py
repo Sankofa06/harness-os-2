@@ -7,6 +7,7 @@ from typing import cast
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 
+from harness.agents.graph import SessionGraph, build_session_graph
 from harness.agents.runloop import handle_user_message
 from harness.api.auth import require_auth
 from harness.api.schemas import (
@@ -96,6 +97,18 @@ async def stop_session(request: Request, session_id: str) -> dict[str, list[str]
     await app.sessions.get(session_id)  # 404s if the session doesn't exist
     canceled_run_ids = app.run_registry.cancel_session(session_id)
     return {"canceled_run_ids": canceled_run_ids}
+
+
+@router.get("/sessions/{session_id}/graph")
+async def get_session_graph(request: Request, session_id: str) -> SessionGraph:
+    """Orchestration graph for this session (AGT-006): a `user` node, one `contact`
+    node per contact that has run in the session, one `tool` node per tool run,
+    and edges for direct @mentions (`message`) and `agents.delegate` calls
+    (`delegation`) — reconstructed fresh from Runs/ToolRuns on every request.
+    """
+    app = _app(request)
+    await app.sessions.get(session_id)  # 404s if the session doesn't exist
+    return await build_session_graph(app, session_id)
 
 
 @router.patch("/sessions/{session_id}/contacts/{contact_id}/binding")
