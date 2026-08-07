@@ -241,6 +241,35 @@ class ToolRun(BaseModel):
     finished_at: str | None = None
 
 
+PermissionPolicy = Literal["allow", "ask", "deny"]
+PermissionOutcome = Literal["allow", "deny"]
+
+
+class PermissionPolicyRecord(BaseModel):
+    """The effective policy for one permission class (PERM-001,
+    SPEC/SECURITY_PRIVACY.md). Always present for all ten classes — an
+    unconfigured class falls back to its default rather than being absent.
+    """
+
+    permission_class: PermissionClass
+    policy: PermissionPolicy
+
+
+class PermissionDecisionLog(BaseModel):
+    """One resolved permission decision (PERM-001): "resolution is explicit and
+    logged" (SPEC/SECURITY_PRIVACY.md). Covers both automatic allow/deny (from a
+    non-"ask" policy) and the final outcome of an "ask" flow once a human decides.
+    """
+
+    id: str
+    tool_run_id: str
+    permission_class: PermissionClass
+    policy: PermissionPolicy
+    outcome: PermissionOutcome
+    decided_by: str | None = None
+    created_at: str = ""
+
+
 class RunMetrics(BaseModel):
     run_id: str
     input_tokens: int | None = None

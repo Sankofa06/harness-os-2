@@ -316,7 +316,7 @@ Task format: ID — title / description / deps / components / acceptance / tests
 - Desc: classes (read/write/execute/network/git/process/model_lifecycle/creative_generation/training/destructive) × policies (allow/ask/deny); resolution explicit + logged; approval API + events.
 - Deps: EVT-002, DB-002. Components: core, tools, api.
 - Acceptance: ask flow blocks until approval; decisions logged.
-- Tests: unit resolution + API approval tests. Status: TODO
+- Tests: unit resolution + API approval tests. Status: DONE
 
 ---
 

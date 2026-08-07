@@ -38,6 +38,7 @@ from harness.persistence.repos import (
 from harness.persistence.repos_control_plane import HostRepo, ModelProfileRepo, ProviderConfigRepo
 from harness.persistence.repos_jobs import JobRepo
 from harness.persistence.repos_model_instances import ModelInstanceRepo
+from harness.persistence.repos_permissions import PermissionDecisionRepo, PermissionPolicyRepo
 from harness.persistence.repos_tools import ToolRunRepo
 from harness.persistence.repos_workspaces import WorkspaceRepo
 from harness.providers.language.base import LanguageProvider
@@ -46,7 +47,7 @@ from harness.providers.language.fake import FakeProvider
 from harness.providers.language.registry import ProviderRegistry
 from harness.tools.builtin import echo_tool
 from harness.tools.lifecycle import ToolExecutor
-from harness.tools.permissions import AllowAllResolver
+from harness.tools.permission_engine import PermissionEngine
 from harness.tools.registry import ToolRegistry
 
 # System-default binding when no contact/role override applies. The fake provider is
@@ -80,6 +81,9 @@ class Application:
     tools: ToolRegistry
     tool_runs: ToolRunRepo
     tool_executor: ToolExecutor
+    permission_policies: PermissionPolicyRepo
+    permission_decisions: PermissionDecisionRepo
+    permission_engine: PermissionEngine
     compiler: ContextCompiler
     api_token: str
     system_binding: Binding = field(default_factory=lambda: SYSTEM_DEFAULT_BINDING)
@@ -163,10 +167,14 @@ async def create_application(config: HarnessConfig | None = None) -> Application
     providers = ProviderRegistry()
     providers.register(FakeProvider())
 
+    permission_policies = PermissionPolicyRepo(db)
+    permission_decisions = PermissionDecisionRepo(db)
+    permission_engine = PermissionEngine(permission_policies, permission_decisions)
+
     tools = ToolRegistry()
     tools.register(echo_tool())
     tool_runs = ToolRunRepo(db)
-    tool_executor = ToolExecutor(tools, tool_runs, bus, AllowAllResolver())
+    tool_executor = ToolExecutor(tools, tool_runs, bus, permission_engine)
 
     compiler = ContextCompiler(HeuristicEstimator(), config.context)
 
@@ -195,6 +203,9 @@ async def create_application(config: HarnessConfig | None = None) -> Application
         tools=tools,
         tool_runs=tool_runs,
         tool_executor=tool_executor,
+        permission_policies=permission_policies,
+        permission_decisions=permission_decisions,
+        permission_engine=permission_engine,
         compiler=compiler,
         api_token=token,
     )

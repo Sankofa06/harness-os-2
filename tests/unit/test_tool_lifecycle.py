@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Literal
 
 import pytest
 
@@ -11,11 +11,35 @@ from harness.tools.registry import ToolRegistry
 
 
 class _FixedResolver:
-    def __init__(self, decision: PermissionDecision) -> None:
-        self._decision = decision
+    """A resolver whose `resolve()` never returns "ask" — used for the immediate
+    allow/deny branches, which never call `await_decision()`.
+    """
 
-    async def resolve(self, permission_class: str) -> PermissionDecision:
+    def __init__(self, decision: Literal["allow", "deny"]) -> None:
+        self._decision: PermissionDecision = decision
+
+    async def resolve(self, permission_class: str, *, run_id: str) -> PermissionDecision:
         return self._decision
+
+    async def await_decision(self, run_id: str) -> Literal["allow", "deny"]:
+        raise AssertionError("should not be called when resolve() doesn't return 'ask'")
+
+
+class _AskThenDecideResolver:
+    """Always asks, then resolves to a fixed final outcome — proves the ask flow
+    actually blocks on `await_decision()` and resumes correctly either way.
+    """
+
+    def __init__(self, final_decision: Literal["allow", "deny"]) -> None:
+        self._final_decision = final_decision
+        self.awaited_run_ids: list[str] = []
+
+    async def resolve(self, permission_class: str, *, run_id: str) -> PermissionDecision:
+        return "ask"
+
+    async def await_decision(self, run_id: str) -> Literal["allow", "deny"]:
+        self.awaited_run_ids.append(run_id)
+        return self._final_decision
 
 
 async def _add_one(arguments: dict[str, Any]) -> dict[str, Any]:
@@ -75,7 +99,34 @@ async def test_denied_permission_skips_execution_and_emits_tool_denied(
 
 
 @pytest.mark.asyncio
-async def test_ask_permission_leaves_run_pending_approval_and_emits_approval_required(
+async def test_ask_then_approved_executes_the_tool(db, registry: ToolRegistry) -> None:
+    import asyncio
+
+    bus = EventBus()
+    received: list[str] = []
+    subscription = bus.subscribe(None)
+    drain_task = asyncio.create_task(_drain(subscription, received))
+
+    resolver = _AskThenDecideResolver("allow")
+    executor = ToolExecutor(registry, ToolRunRepo(db), bus, resolver)
+    run = await executor.execute("add_one", {"value": 41})
+    await asyncio.sleep(0.05)
+    drain_task.cancel()
+    subscription.close()
+
+    assert run.status == "succeeded"
+    assert run.result == {"result": 42}
+    assert resolver.awaited_run_ids == [run.id]
+    assert received == [
+        "tool.requested",
+        "tool.approval_required",
+        "tool.started",
+        "tool.completed",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_ask_then_rejected_denies_the_run_without_executing(
     db, registry: ToolRegistry
 ) -> None:
     import asyncio
@@ -85,15 +136,17 @@ async def test_ask_permission_leaves_run_pending_approval_and_emits_approval_req
     subscription = bus.subscribe(None)
     drain_task = asyncio.create_task(_drain(subscription, received))
 
-    executor = ToolExecutor(registry, ToolRunRepo(db), bus, _FixedResolver("ask"))
+    resolver = _AskThenDecideResolver("deny")
+    executor = ToolExecutor(registry, ToolRunRepo(db), bus, resolver)
     run = await executor.execute("add_one", {"value": 41})
     await asyncio.sleep(0.05)
     drain_task.cancel()
     subscription.close()
 
-    assert run.status == "pending_approval"
+    assert run.status == "denied"
     assert run.result is None
-    assert received == ["tool.requested", "tool.approval_required"]
+    assert resolver.awaited_run_ids == [run.id]
+    assert received == ["tool.requested", "tool.approval_required", "tool.denied"]
 
 
 @pytest.mark.asyncio

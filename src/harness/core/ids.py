@@ -36,6 +36,7 @@ PREFIXES: frozenset[str] = frozenset(
         "evt",
         "sec",
         "node",
+        "perm",
     }
 )
 

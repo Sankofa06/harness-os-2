@@ -46,9 +46,23 @@ mirroring `FakeProvider`'s role for language providers — a real, safe, zero-co
 tool to exercise the lifecycle against. `/tools`, `/tools/{name}/run`, `/tools/
 runs*` expose it over the API.
 
+PERM-001 (Permission engine) is also done, replacing TOOL-001's `AllowAllResolver`
+placeholder with a real `PermissionEngine`: ten permission classes each have a
+policy (`allow`/`ask`/`deny`) — conservative defaults (`read`/`model_lifecycle`
+allow, `destructive` deny, everything else asks), overridable per class via
+`PUT /permissions/policies/{class}`. An `"ask"` decision genuinely blocks — the
+tool's Job sits "running" until `POST /permissions/decisions/{run_id}/{approve,
+reject}` resolves it — and every resolution (automatic or human) is logged to a
+`permission_decisions` audit table. Building this surfaced and fixed a real
+concurrency bug (D-030): SQLite's `:memory:`/single-file databases pool onto one
+shared `StaticPool` connection that isn't safe for two coroutines to use at once,
+and PERM-001 was the first feature to create that kind of sustained overlap (a
+backgrounded Job racing live HTTP polling) — `Database` now serializes every
+query/execute through an `asyncio.Lock`.
+
 ## Active task
-None in flight. Next up per `TASKS.md`: PERM-001 (Permission engine), which unlocks
-TOOL-002 (file/shell/git tools with real permission classes).
+None in flight. Next up per `TASKS.md`: TOOL-002 (file/shell/git tools, now that
+both TOOL-001 and PERM-001 are done).
 
 ## Completed milestones
 - Phase 1: full spec-kit reading pass (all `SPEC/`, `ADR/`, `BUILD/`, `TESTING/`,
@@ -92,9 +106,11 @@ TOOL-002 (file/shell/git tools with real permission classes).
   SPEC/HOSTS_AND_NODE.md, `host_capabilities` table).
 
 ## Known failures
-None functionally. 203/203 backend tests pass, 2/2 web unit tests pass, 1/1 Playwright
-e2e test passes. `ruff check`, `ruff format --check`, and `mypy --strict` are clean on
-`src/harness`. `eslint`, `vitest`, and `tsc -b && vite build` are clean on `web/`.
+None functionally. 211/211 backend tests pass (repeatedly and reliably — see D-030
+for a concurrency race that used to make two of them flaky before its fix), 2/2 web
+unit tests pass, 1/1 Playwright e2e test passes. `ruff check`, `ruff format --check`,
+and `mypy --strict` are clean on `src/harness`. `eslint`, `vitest`, and `tsc -b &&
+vite build` are clean on `web/`.
 Cosmetic: some test runs emit a `PytestUnhandledThreadExceptionWarning` from an
 aiosqlite background thread racing pytest-asyncio's event-loop teardown in
 short-lived tests; it does not affect pass/fail status and is a known aiosqlite/
@@ -104,7 +120,7 @@ asyncio interaction, not an application bug.
 None.
 
 ## Architectural decisions made during implementation
-See `DECISIONS.md` for the full list (D-001 through D-029). Notable ones affecting
+See `DECISIONS.md` for the full list (D-001 through D-030). Notable ones affecting
 what's built so far:
 - D-003/D-004: SQLAlchemy async + plain SQL migrations, schema grows incrementally
   per subsystem milestone rather than all at once.
@@ -119,10 +135,9 @@ what's built so far:
 - D-014: license selection is deferred to the project owner (placeholder in place).
 
 ## What is NOT yet built
-The permission engine (PERM-001 — a real class×policy resolver and approval API;
-TOOL-001's lifecycle already calls a `PermissionResolver` interface, just not a real
-one yet) and TOOL-002's file/shell/git tools that depend on it, Artifacts
-(ART-001), MCP/skills, creative compute,
+TOOL-002's file/shell/git tools (the registry, lifecycle, and now a real permission
+engine they'll run through all exist — TOOL-002 is registering the actual tools),
+Artifacts (ART-001), MCP/skills, creative compute,
 analytics/benchmarks, the Node daemon, the rest of the WebUI (graph/compute/models/
 creative/assets/analytics/approvals views, full three-panel IA, context meter,
 accessibility audit), TUI feature completion, demo mode content, screenshot
@@ -156,7 +171,7 @@ HARNESS_DEMO_MODE=1 uv run harness serve
 
 Test suites:
 ```bash
-uv run pytest tests -q                      # backend: 203 tests
+uv run pytest tests -q                      # backend: 211 tests
 cd web && npm run test                      # web unit: vitest
 cd web && npx playwright test               # web e2e (needs both servers running)
 ```

@@ -399,3 +399,44 @@ Format: decision / reason / alternatives / consequences.
 - Consequences: a `ToolRun`'s `id` is not the same as its `Job`'s `id` — API
   clients that need the `ToolRun` must look it up (by tool name, or by listing
   `/tools/runs` after the Job succeeds) rather than assume the Job's own ID.
+
+## D-030 — PERM-001's "ask" flow blocks on `await_decision()`; a real engine replaces D-028's placeholder
+- Decision: `PermissionResolver.resolve()` keeps returning `"allow"`/`"ask"`/`"deny"`
+  (D-028), but `ToolExecutor` now actually blocks when it sees `"ask"`: it marks the
+  `ToolRun` `pending_approval`, emits `tool.approval_required`, then awaits
+  `PermissionResolver.await_decision(run_id)` before falling through to execute (on
+  `"allow"`) or denying (on `"deny"`) — satisfying PERM-001's "ask flow blocks until
+  approval" acceptance criterion literally. `PermissionEngine` (replacing
+  `AllowAllResolver` in `create_application()`) implements this with one
+  `asyncio.Future` per pending run, resolved by `decide()` — called from
+  `POST /permissions/decisions/{run_id}/{approve,reject}`. Every resolution is
+  logged to a `permission_decisions` table: immediately for automatic allow/deny
+  (inside `resolve()`), or once a human decides (inside `decide()`), satisfying
+  "resolution is explicit and logged" (SPEC/SECURITY_PRIVACY.md). Ten permission
+  classes get conservative defaults (`DEFAULT_POLICIES` in `harness.core.
+  permissions`): only `read` and `model_lifecycle` default to `allow`,
+  `destructive` defaults to `deny`, everything else defaults to `ask`; an operator
+  overrides any class via `PUT /permissions/policies/{class}`.
+- Reason: blocking inside `await_decision()` is safe specifically because tool
+  execution already runs inside a `JobManager` background task (D-029) — an
+  ordinary async wait, not a request-thread block — so a Job can sit "running" for
+  as long as a human takes to respond, exactly like any other long-running Job.
+- Consequences (a real bug found and fixed while building this): PERM-001 is the
+  first feature to create genuine, sustained concurrent database access on the same
+  event loop — a backgrounded Job task blocked mid-execution racing a foreground
+  HTTP polling loop, both hitting the same in-memory SQLite `Database`. That exposed
+  a latent bug: SQLAlchemy pools `:memory:`/single-file SQLite on a `StaticPool`
+  (one shared DBAPI connection for every checkout), which is not safe for two
+  coroutines to use concurrently — interleaved `engine.begin()` calls raced,
+  observed as an operation (a Job's own `set_status("succeeded")`) that silently
+  never completed rather than an exception, so a Job would occasionally hang
+  forever even though the work it wrapped had already finished and persisted
+  correctly. Fixed by serializing every `Database` query/execute through one
+  `asyncio.Lock` (`src/harness/persistence/db.py`) — SQLite has no real concurrent
+  writers anyway, so this costs nothing but a touch of contention and removes a
+  correctness bug that would otherwise get worse as more of the system does
+  genuinely concurrent background work (tool execution, host telemetry, creative
+  jobs). `Database.begin()` — an unused raw-transaction escape hatch nothing called
+  — was removed rather than also lock-wrapped, since a caller using it directly
+  would bypass the lock and reintroduce the race; multi-statement callers should use
+  `execute()`/`fetch_all()` instead.

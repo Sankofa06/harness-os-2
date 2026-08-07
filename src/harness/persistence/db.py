@@ -1,7 +1,20 @@
-"""Async SQLite database with a sequential SQL migration runner (DECISIONS.md D-003/D-004)."""
+"""Async SQLite database with a sequential SQL migration runner (DECISIONS.md D-003/D-004).
+
+SQLAlchemy pools a single-file (or in-memory) SQLite database on a `StaticPool` — one
+underlying DBAPI connection shared by every checkout, because SQLite's `:memory:`
+databases are connection-scoped. That single connection is not safe for two
+coroutines to use concurrently: interleaved `BEGIN`s from overlapping `engine.begin()`
+calls corrupt the connection's transaction state, which surfaces as operations that
+silently never complete rather than a raised error (PERM-001's "ask" flow — a
+background Job task and a concurrent HTTP request both touching the DB at once — is
+what first exercised this densely enough to expose it, D-030). `Database` therefore
+serializes every query/execute through one `asyncio.Lock` rather than relying on
+SQLAlchemy's pool to do it.
+"""
 
 from __future__ import annotations
 
+import asyncio
 import re
 from importlib import resources
 from pathlib import Path
@@ -36,9 +49,10 @@ class Database:
             else (f"sqlite+aiosqlite:///{self.path}")
         )
         self.engine: AsyncEngine = create_async_engine(url)
+        self._lock = asyncio.Lock()
 
     async def migrate(self) -> None:
-        async with self.engine.begin() as conn:
+        async with self._lock, self.engine.begin() as conn:
             await conn.execute(text("PRAGMA journal_mode=WAL"))
             await conn.execute(text("PRAGMA foreign_keys=ON"))
             await conn.execute(
@@ -68,7 +82,7 @@ class Database:
         await self.engine.dispose()
 
     async def fetch_all(self, sql: str, params: dict[str, Any] | None = None) -> list[Any]:
-        async with self.engine.connect() as conn:
+        async with self._lock, self.engine.connect() as conn:
             result = await conn.execute(text(sql), params or {})
             return list(result.mappings().all())
 
@@ -77,19 +91,15 @@ class Database:
         return rows[0] if rows else None
 
     async def execute(self, sql: str, params: dict[str, Any] | None = None) -> None:
-        async with self.engine.begin() as conn:
+        async with self._lock, self.engine.begin() as conn:
             await conn.execute(text(sql), params or {})
 
     async def execute_returning_rowid(self, sql: str, params: dict[str, Any] | None = None) -> int:
-        async with self.engine.begin() as conn:
+        async with self._lock, self.engine.begin() as conn:
             result = await conn.execute(text(sql), params or {})
             rowid = result.lastrowid
             assert rowid is not None
             return int(rowid)
-
-    def begin(self) -> Any:
-        """Transactional connection context manager for multi-statement operations."""
-        return self.engine.begin()
 
 
 async def exec_in(conn: AsyncConnection, sql: str, params: dict[str, Any] | None = None) -> Any:

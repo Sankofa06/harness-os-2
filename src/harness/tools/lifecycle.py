@@ -4,9 +4,11 @@
     -> compact result
 
 Artifact creation (step 7) is a no-op hook until ART-001 lands — every other step
-is real and persisted. "approve" (step 4) resolves through `PermissionResolver`;
-until PERM-001 replaces the default `AllowAllResolver`, "ask" and "deny" are
-reachable code paths with no built-in caller producing them yet.
+is real and persisted. "approve" (step 4) resolves through `PermissionResolver`
+(PERM-001's `PermissionEngine` in production); a `"deny"` decision — whether
+immediate (policy `deny`) or the final answer to an `"ask"` — always ends the run
+denied without executing the handler. An `"ask"` decision blocks on
+`await_decision()` until a human resolves it before falling through to execute.
 """
 
 from __future__ import annotations
@@ -67,7 +69,7 @@ class ToolExecutor:
         )
         await self._emit(run, "tool.requested", {"arguments": arguments})
 
-        decision = await self._permissions.resolve(tool.permission_class)
+        decision = await self._permissions.resolve(tool.permission_class, run_id=run.id)
         if decision == "deny":
             run = await self._runs.set_status(run.id, "denied")
             await self._emit(run, "tool.denied", {})
@@ -78,7 +80,12 @@ class ToolExecutor:
             # ("tool.approval_required"), even though the persisted ToolRun status
             # is the more descriptive "pending_approval".
             await self._emit(run, "tool.approval_required", {})
-            return run
+            final = await self._permissions.await_decision(run.id)
+            if final == "deny":
+                run = await self._runs.set_status(run.id, "denied")
+                await self._emit(run, "tool.denied", {})
+                return run
+            # final == "allow": fall through to execute below.
 
         run = await self._runs.set_status(run.id, "running")
         await self._emit(run, "tool.started", {})

@@ -13,6 +13,7 @@ names; file paths may evolve. Status: PLANNED / IMPLEMENTED / PASSING.
 | Auth protects remote access | `tests/api/test_auth.py` (REST), `tests/api/test_events_ws.py` (WS) — both loopback vs remote+token | PASSING |
 | API contract tests pass | `tests/api/` suite + OpenAPI schema snapshot | IMPLEMENTED (no frozen snapshot yet) |
 | Long actions create cancelable Jobs with a persisted state machine and event trail | `tests/unit/test_jobs.py`, `tests/api/test_jobs.py` | PASSING |
+| Concurrent DB access (background Job racing live HTTP polling) doesn't hang or corrupt state (D-030) | `tests/persistence/test_db_concurrency.py`, `tests/api/test_permissions.py` ask/deny flows | PASSING |
 
 ## Context
 | Bootstrap ≤ 4K tokens | `tests/context/test_compiler.py::test_bootstrap_budget_under_4k` | PASSING |
@@ -71,7 +72,7 @@ names; file paths may evolve. Status: PLANNED / IMPLEMENTED / PASSING.
 | Add MCP server; compact index; lazy schema | `tests/mcp/test_lazy_index.py` | PLANNED |
 | Skill metadata w/o body load | `tests/skills/test_lazy_skills.py` | PLANNED |
 | Superpower toggles | `tests/skills/test_superpowers.py` | PLANNED |
-| Permission ask/allow/deny | `tests/unit/test_permissions.py`, `tests/api/test_approvals.py` | PLANNED |
+| Permission ask/allow/deny; ask flow blocks until approval; decisions logged | `tests/api/test_permissions.py` | PASSING |
 
 ## Creative
 | SM installation discovery (Data layout) | `tests/creative/test_discovery.py` vs fixture tree | PLANNED |

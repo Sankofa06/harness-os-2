@@ -20,6 +20,7 @@ from harness.api.routes import (
     instances,
     jobs,
     model_profiles,
+    permissions,
     providers,
     secrets,
     sessions,
@@ -94,5 +95,6 @@ def create_app(
     app.include_router(instances.router, prefix=API_PREFIX)
     app.include_router(workspaces.router, prefix=API_PREFIX)
     app.include_router(tools.router, prefix=API_PREFIX)
+    app.include_router(permissions.router, prefix=API_PREFIX)
 
     return app
