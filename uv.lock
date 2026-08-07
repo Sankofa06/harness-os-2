@@ -395,6 +395,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiosqlite" },
+    { name = "asyncssh" },
     { name = "fastapi" },
     { name = "httpx" },
     { name = "jsonschema" },
@@ -415,9 +416,6 @@ secrets = [
     { name = "cryptography" },
     { name = "keyring" },
 ]
-ssh = [
-    { name = "asyncssh" },
-]
 
 [package.dev-dependencies]
 dev = [
@@ -433,7 +431,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "aiosqlite", specifier = ">=0.20" },
-    { name = "asyncssh", marker = "extra == 'ssh'", specifier = ">=2.17" },
+    { name = "asyncssh", specifier = ">=2.17" },
     { name = "cryptography", marker = "extra == 'secrets'", specifier = ">=43.0" },
     { name = "fastapi", specifier = ">=0.115" },
     { name = "httpx", specifier = ">=0.27" },
@@ -448,7 +446,7 @@ requires-dist = [
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32" },
     { name = "websockets", specifier = ">=13.0" },
 ]
-provides-extras = ["ssh", "node", "secrets"]
+provides-extras = ["node", "secrets"]
 
 [package.metadata.requires-dev]
 dev = [

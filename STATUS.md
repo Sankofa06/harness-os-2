@@ -4,17 +4,15 @@ _Last updated: 2026-08-06_
 
 ## Current milestone
 Milestones 1 (kernel), 2 (control plane), and 3 (language compute) are all fully
-done. Every required v1 adapter exists (fake, generic OpenAI-compatible, LM Studio,
-Ollama, OpenRouter, OpenAI, Anthropic, Gemini) and is now actually reachable: a
-persisted `ProviderConfig` can be turned into a live adapter on demand
-(`Application.get_or_build_provider`), models can be listed/loaded/unloaded through
-`/language/models*` and `/language/instances*` (as Jobs), and settings validate
-against each adapter's real schema. Verified against a live running server, not just
-unit tests — see the manual curl walkthrough in this session's history. Moving into
-Milestone 4 (execution): SSH hosts and workspaces.
+done. Milestone 4 (execution) is in progress: HOST-001 (SSH agentless adapter) is
+done — `SSHHost` (asyncssh-based) does test-connection/exec-stream/cancel/sftp
+read-write-list-move-delete against a real local SSH server in tests (not mocks),
+with explicit fingerprint pinning (no known_hosts file) and argv quoting (no shell
+injection, proven by a regression test). `POST /hosts/{id}/test` exercises this live.
 
 ## Active task
-None in flight. Next up per `TASKS.md`: HOST-001 (SSH agentless adapter).
+None in flight. Next up per `TASKS.md`: HOST-002 (path safety — workspace roots,
+canonicalization, traversal rejection).
 
 ## Completed milestones
 - Phase 1: full spec-kit reading pass (all `SPEC/`, `ADR/`, `BUILD/`, `TESTING/`,
@@ -58,7 +56,7 @@ None in flight. Next up per `TASKS.md`: HOST-001 (SSH agentless adapter).
   SPEC/HOSTS_AND_NODE.md, `host_capabilities` table).
 
 ## Known failures
-None functionally. 149/149 backend tests pass, 2/2 web unit tests pass, 1/1 Playwright
+None functionally. 163/163 backend tests pass, 2/2 web unit tests pass, 1/1 Playwright
 e2e test passes. `ruff check`, `ruff format --check`, and `mypy --strict` are clean on
 `src/harness`. `eslint`, `vitest`, and `tsc -b && vite build` are clean on `web/`.
 Cosmetic: some test runs emit a `PytestUnhandledThreadExceptionWarning` from an
@@ -70,7 +68,7 @@ asyncio interaction, not an application bug.
 None.
 
 ## Architectural decisions made during implementation
-See `DECISIONS.md` for the full list (D-001 through D-020). Notable ones affecting
+See `DECISIONS.md` for the full list (D-001 through D-023). Notable ones affecting
 what's built so far:
 - D-003/D-004: SQLAlchemy async + plain SQL migrations, schema grows incrementally
   per subsystem milestone rather than all at once.
@@ -85,10 +83,12 @@ what's built so far:
 - D-014: license selection is deferred to the project owner (placeholder in place).
 
 ## What is NOT yet built
-SSH hosts/workspaces execution (host *records* exist via CP-004, but nothing yet
-connects to one), tools/permissions engine beyond the stub, MCP/skills, creative
-compute, analytics/benchmarks, the Node daemon, the rest of the WebUI (graph/compute/
-models/creative/assets/analytics/approvals views, full three-panel IA, context meter,
+HOST-002's path-safety layer (SSHHost itself has no workspace-root enforcement yet —
+it will execute/read/write anywhere the SSH user can), Workspaces (WSP-001/002:
+`/workspaces*`, git operations), the Tool registry/lifecycle and permission engine
+(TOOL-001/002, PERM-001), Artifacts (ART-001), MCP/skills, creative compute,
+analytics/benchmarks, the Node daemon, the rest of the WebUI (graph/compute/models/
+creative/assets/analytics/approvals views, full three-panel IA, context meter,
 accessibility audit), TUI feature completion, demo mode content, screenshot
 automation, GitHub Pages site, and marketing copy. These are tracked as their own
 `TASKS.md` entries and proceed in dependency order per `BUILD/IMPLEMENTATION_PLAN.md`.
@@ -120,7 +120,7 @@ HARNESS_DEMO_MODE=1 uv run harness serve
 
 Test suites:
 ```bash
-uv run pytest tests -q                      # backend: 149 tests
+uv run pytest tests -q                      # backend: 163 tests
 cd web && npm run test                      # web unit: vitest
 cd web && npx playwright test               # web e2e (needs both servers running)
 ```

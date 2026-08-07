@@ -215,3 +215,49 @@ Format: decision / reason / alternatives / consequences.
   `/language/instances/{id}/unload` all run through this same lazy-build path, and a
   single provider failing model discovery doesn't fail the whole `/language/models`
   aggregation (SPEC/ARCHITECTURE.md failure-isolation).
+
+## D-021 — asyncssh moved from optional extra to a core dependency
+- Decision: `asyncssh` was originally scoped as `[project.optional-dependencies] ssh`;
+  HOST-001 moved it into the core `dependencies` list.
+- Reason: ADR 0002 (agentless-first) makes SSH the foundational remote-execution
+  mechanism, not an opt-in feature — "remote coding MUST work via standard SSH plus
+  existing model/engine APIs" is a non-negotiable product principle (README.md), not
+  something the server should be installable without.
+- Consequences: `harness-os` now always installs `asyncssh`; only `node` (psutil)
+  remains a true optional extra, matching NODE-001's "optional lightweight service"
+  framing.
+
+## D-022 — SSH host-key trust is explicit fingerprint pinning, not a known_hosts file
+- Decision: `SSHHost._connect()` always calls `asyncssh.connect(..., known_hosts=None)`
+  and does its own verification: it reads `conn.get_server_host_key()`, computes the
+  fingerprint, and compares it against `Host.known_host_fingerprint` when that field is
+  set. `test_connection()` returns the discovered fingerprint without requiring a match,
+  so a caller can implement trust-on-first-use (show the fingerprint, get user
+  confirmation, then persist it via a separate `PATCH /hosts/{id}`) rather than the
+  adapter silently trusting an unpinned host.
+- Reason: SPEC/HOSTS_AND_NODE.md requires "known-host verification"; a conventional
+  `~/.ssh/known_hosts` file is a poor fit for a multi-user server process managing
+  hosts on behalf of different sessions, and asyncssh's own known_hosts format expects
+  the raw public key, not just a fingerprint — storing only the fingerprint (which is
+  what fits naturally in `Host.known_host_fingerprint`, a single text column) means
+  Harness owns verification directly instead of shelling out to OS SSH tooling.
+- Consequences: `POST /hosts/{id}/test` (HOST-001) never raises on a fingerprint
+  mismatch — it reports `{"ok": false, "error": ...}` so the caller can decide what to
+  do, since "testing" a host and "trusting" a host are different actions and the API
+  must not silently pin an attacker-supplied key just because someone called `/test`.
+
+## D-023 — SSH command execution: shlex.join, not an argv-array exec request
+- Decision: `SSHHost.exec_stream()` builds one command string via `shlex.join(argv)`
+  (each argument individually shell-quoted) and sends that as the SSH `exec` channel's
+  command. `cwd` is applied as a quoted `cd <dir> &&` prefix rather than a separate
+  channel option.
+- Reason: the SSH protocol's exec request (RFC 4254 §6.5) carries exactly one string,
+  interpreted by the remote user's login shell — there is no argv-array exec request
+  type the way local `subprocess` supports. AGENTS.md's "no shell string concatenation
+  for SSH execution" therefore means *quote every argument*, not *avoid the shell
+  entirely* (which SSH doesn't allow). A regression test
+  (`test_exec_stream_quotes_arguments_safely`, tests/hosts/test_ssh.py) sends an
+  argument containing `; && echo pwned` as a literal `echo` argument against a real
+  local SSH server and asserts it comes back as inert text, not executed.
+- Consequences: any future caller building argv must never pre-format a shell string
+  itself — `exec_stream` owns quoting for the whole call.

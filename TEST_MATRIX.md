@@ -43,9 +43,13 @@ names; file paths may evolve. Status: PLANNED / IMPLEMENTED / PASSING.
 | Adapter contract (all) | `tests/providers/conformance/` shared suite | PLANNED |
 
 ## Hosts / workspaces
-| Add host / test / browse / mkdir / workspace / rw files / shell stream / git / cancel | `tests/hosts/test_ssh_agentless.py` vs local sshd fixture | PLANNED |
-| Works without Node on remote | same suite runs with no node component | PLANNED |
-| Path traversal rejected | `tests/security/test_path_safety.py` | PLANNED |
+| Add host / test connection (real fingerprint check) | `tests/api/test_host_ssh.py` vs real local SSH server | PASSING |
+| SSH exec streams stdout/stderr, reports exit status, cancelable | `tests/hosts/test_ssh.py` vs real local SSH server | PASSING |
+| SFTP read/write/list/move/delete/mkdir | `tests/hosts/test_ssh.py` | PASSING |
+| Argv quoted, not shell-concatenated (injection resistance) | `tests/hosts/test_ssh.py::test_exec_stream_quotes_arguments_safely` | PASSING |
+| Workspace browse / mkdir / rw files / git | `tests/api/test_workspaces.py` (WSP-001/002, not yet built) | PLANNED |
+| Works without Node on remote | HOST-001/WSP-* suites never depend on a node component | PASSING (structural — no Node dependency exists anywhere in the SSH path) |
+| Path traversal rejected | `tests/security/test_path_safety.py` (HOST-002, not yet built) | PLANNED |
 
 ## Node
 | Registers + authenticates (pairing) | `tests/node/test_pairing.py` | PLANNED |

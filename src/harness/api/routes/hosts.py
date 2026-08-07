@@ -1,7 +1,7 @@
 """Host registry endpoints (CP-004, SPEC/API_CONTRACT.md, SPEC/HOSTS_AND_NODE.md).
 
-`/hosts/{id}/test` and `/hosts/{id}/health` require live connectivity (SSH/Node) and
-are added with HOST-001; this module covers the persisted capability model only.
+`/hosts/{id}/health` requires ongoing telemetry (Node/ANA-002) and isn't implemented
+yet; `/hosts/{id}/test` (HOST-001) performs a real SSH connectivity + host-key check.
 """
 
 from __future__ import annotations
@@ -14,7 +14,9 @@ from pydantic import BaseModel, Field
 from harness.api.auth import require_auth
 from harness.core.app import Application
 from harness.core.domain import Host, HostKind
+from harness.core.errors import PermissionDeniedError, ProviderError, ValidationFailedError
 from harness.core.ids import new_id
+from harness.hosts.resolve import build_ssh_host
 
 router = APIRouter(dependencies=[Depends(require_auth)], tags=["hosts"])
 
@@ -52,6 +54,36 @@ async def create_host(request: Request, body: HostCreate) -> Host:
 @router.get("/hosts/{host_id}")
 async def get_host(request: Request, host_id: str) -> Host:
     return await _app(request).hosts.get(host_id)
+
+
+class HostTestResult(BaseModel):
+    ok: bool
+    fingerprint: str | None = None
+    pinned_fingerprint: str | None = None
+    fingerprint_matches_pinned: bool | None = None
+    error: str | None = None
+
+
+@router.post("/hosts/{host_id}/test")
+async def test_host(request: Request, host_id: str) -> HostTestResult:
+    app = _app(request)
+    host = await app.hosts.get(host_id)
+    try:
+        ssh_host = await build_ssh_host(host, app.secret_refs, app.secret_store)
+    except ValidationFailedError as exc:
+        return HostTestResult(ok=False, error=str(exc))
+    try:
+        fingerprint = await ssh_host.test_connection()
+    except (ProviderError, PermissionDeniedError) as exc:
+        return HostTestResult(ok=False, error=str(exc))
+    return HostTestResult(
+        ok=True,
+        fingerprint=fingerprint,
+        pinned_fingerprint=host.known_host_fingerprint,
+        fingerprint_matches_pinned=(
+            fingerprint == host.known_host_fingerprint if host.known_host_fingerprint else None
+        ),
+    )
 
 
 @router.get("/hosts/{host_id}/capabilities")

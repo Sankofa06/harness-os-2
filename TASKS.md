@@ -204,7 +204,7 @@ Task format: ID — title / description / deps / components / acceptance / tests
 - Desc: asyncssh: test connection, exec with streamed stdout/stderr, cancel, sftp read/write/list/move/delete, known-host verification, keys via secret store, structured argv (no shell string concat).
 - Deps: CP-004, SEC-001. Components: hosts.
 - Acceptance: DoD Hosts/workspaces bullets vs local sshd fixture.
-- Tests: integration vs local SSH server fixture. Status: TODO
+- Tests: integration vs local SSH server fixture. Status: DONE
 
 ### HOST-002 Path safety
 - Desc: configured workspace roots, canonicalization, traversal rejection, no implicit sudo.

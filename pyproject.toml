@@ -17,10 +17,10 @@ dependencies = [
     "textual>=0.86",
     "websockets>=13.0",
     "jsonschema>=4.23",
+    "asyncssh>=2.17",
 ]
 
 [project.optional-dependencies]
-ssh = ["asyncssh>=2.17"]
 node = ["psutil>=6.0"]
 secrets = ["keyring>=25.0", "cryptography>=43.0"]
 
