@@ -697,3 +697,33 @@ Format: decision / reason / alternatives / consequences.
   silently unsupported. Auth is bearer-token-only for now; an MCP server needing
   a different auth scheme (OAuth, mTLS) is likewise out of scope until a real
   use case needs it.
+
+## D-041 — capabilities.search/tools.describe: activation is a persisted per-session set, resolved fresh at compile time
+- Decision: MCP-002 adds two native meta-tools — `capabilities.search(query)`
+  (`harness.capabilities.search`), which returns compact candidates (kind,
+  ref, name, description, estimated schema tokens, trust class) across the
+  native `ToolRegistry` and MCP-001's `mcp_tool_index`, never a full JSON
+  Schema; and `tools.describe(session_id, kind, ref)`
+  (`harness.capabilities.activation`), which fetches one candidate's full
+  schema *and* records `(session_id, kind, ref)` in a new
+  `session_activated_capabilities` table. The run loop
+  (`harness.agents.runloop.run_contact`) resolves that session's activated
+  rows fresh from their source — `ToolRegistry.get`/`McpIndexRepo.get_schema`
+  — on every compile via `resolve_active_tool_schemas`, rather than storing
+  the resolved schema text itself, matching D-039's "derive, don't
+  duplicate" rule for the session graph: a tool's schema changing (or an MCP
+  server being re-indexed) is reflected on the very next turn with no stale
+  copy anywhere, and a since-removed tool is silently skipped rather than
+  breaking a compile. Skills are not part of this search yet — SKL-001 (still
+  TODO) will extend `search_capabilities` to include skill candidates once a
+  skill index exists; there is nothing to search today.
+- Reason: keeps a single source of truth for every schema (the registry / the
+  MCP index) instead of a second, driftable copy in the activation table, and
+  keeps activation itself trivially idempotent (`SessionCapabilityRepo.
+  activate` no-ops on a repeat call) since only identity, not content, is
+  persisted.
+- Consequences: activation is session-scoped and permanent for that session's
+  lifetime (no explicit deactivate yet) — acceptable since MCP-002's DoD is
+  "budget unaffected until activation," not "budget shrinks back down later";
+  add a `tools.forget`-style deactivation call if a real workflow needs
+  context to shrink back after a capability stops being relevant.

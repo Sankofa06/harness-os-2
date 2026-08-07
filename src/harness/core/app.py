@@ -17,6 +17,8 @@ from harness.agents.delegate_tool import register_delegation_tool
 from harness.agents.registry import RunRegistry
 from harness.agents.seeds import seed_agents
 from harness.artifacts.store import ArtifactBlobStore
+from harness.capabilities.activation import register_tools_describe_tool
+from harness.capabilities.search import register_capabilities_search_tool
 from harness.context.compiler import ContextCompiler
 from harness.context.tokens import HeuristicEstimator
 from harness.core.config import HarnessConfig
@@ -39,6 +41,7 @@ from harness.persistence.repos import (
     TeamRepo,
 )
 from harness.persistence.repos_artifacts import ArtifactRepo
+from harness.persistence.repos_capabilities import SessionCapabilityRepo
 from harness.persistence.repos_context import TranscriptStateRepo
 from harness.persistence.repos_control_plane import HostRepo, ModelProfileRepo, ProviderConfigRepo
 from harness.persistence.repos_jobs import JobRepo
@@ -97,6 +100,7 @@ class Application:
     run_registry: RunRegistry
     mcp_servers: McpServerRepo
     mcp_index: McpIndexRepo
+    session_capabilities: SessionCapabilityRepo
     compiler: ContextCompiler
     api_token: str
     system_binding: Binding = field(default_factory=lambda: SYSTEM_DEFAULT_BINDING)
@@ -196,6 +200,9 @@ async def create_application(config: HarnessConfig | None = None) -> Application
     run_registry = RunRegistry()
     mcp_servers = McpServerRepo(db)
     mcp_index = McpIndexRepo(db)
+    session_capabilities = SessionCapabilityRepo(db)
+    register_capabilities_search_tool(tools, mcp_index)
+    register_tools_describe_tool(tools, tools, mcp_index, session_capabilities)
 
     compiler = ContextCompiler(HeuristicEstimator(), config.context)
 
@@ -233,6 +240,7 @@ async def create_application(config: HarnessConfig | None = None) -> Application
         run_registry=run_registry,
         mcp_servers=mcp_servers,
         mcp_index=mcp_index,
+        session_capabilities=session_capabilities,
         compiler=compiler,
         api_token=token,
     )

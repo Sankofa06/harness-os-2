@@ -18,6 +18,7 @@ from typing import cast
 
 from harness.agents.binding import resolve_binding
 from harness.agents.mentions import parse_mentions
+from harness.capabilities.activation import resolve_active_tool_schemas
 from harness.core.app import Application
 from harness.core.domain import Contact, MessageRole, Run, RunMetrics
 from harness.core.ids import new_id
@@ -174,12 +175,16 @@ async def run_contact(
 
         history = await app.messages.list_for_session(session_id)
         transcript_state = await app.transcript_state.get(session_id)
+        active_tool_schemas = await resolve_active_tool_schemas(
+            session_id, app.session_capabilities, app.tools, app.mcp_index
+        )
         compiled = app.compiler.compile(
             contact=contact,
             role=role,
             personas=personas,
             history=history,
             transcript_state=transcript_state,
+            active_tool_schemas=active_tool_schemas,
         )
         await app.publish(
             Event(

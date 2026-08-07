@@ -5,8 +5,27 @@ _Last updated: 2026-08-07_
 ## Current milestone
 Milestones 1 (kernel), 2 (control plane), 3 (language compute), 4 (execution),
 and 5 (agent runtime) are all fully done. Milestone 6 (MCP + Skills) is in
-progress: MCP-001 (lazy MCP index) is done — see the note below. Next up in
-Milestone 6 is MCP-002 (capabilities.search + activation).
+progress: MCP-001 (lazy MCP index) and MCP-002 (capabilities.search +
+activation) are both done — see the notes below. Next up in Milestone 6 is
+SKL-001 (Skills).
+
+MCP-002: `capabilities.search` (`harness.capabilities.search`) and
+`tools.describe` (`harness.capabilities.activation`) are two new native
+meta-tools, callable the same way as any other tool (`POST /tools/{name}/
+run`). `capabilities.search(query)` returns compact candidates — kind, ref,
+name, description, estimated schema tokens, trust class — across the native
+`ToolRegistry` and MCP-001's `mcp_tool_index`, plain case-insensitive keyword
+matching against name+description, never a full JSON Schema. `tools.describe
+(session_id, kind, ref)` fetches one candidate's full schema and records the
+activation in a new `session_activated_capabilities` table; `harness.agents.
+runloop.run_contact` resolves that session's activated capabilities fresh
+from their source (`ToolRegistry`/`McpIndexRepo`) on every compile and passes
+them to `ContextCompiler.compile`'s `active_tool_schemas`. Proven end to end:
+a session's first turn compiles with zero tool-schema cost, `tools.describe`
+activates one, and only the *next* turn's compile carries its cost — against
+a real fixture MCP server and the real run loop, not by calling the compiler
+directly. Skills aren't part of the search yet (SKL-001, next, still TODO) —
+there's no skill index to search. See D-041.
 
 MCP-001: `harness.mcp.client.McpClient` is a hand-rolled JSON-RPC 2.0 client
 against the MCP spec's Streamable HTTP transport (a single POST endpoint),
@@ -172,8 +191,8 @@ from persisted Runs/ToolRuns on every request rather than a separately
 maintained structure, so it can't drift from what actually happened.
 
 ## Active task
-MCP-001 is done (see Current milestone above). Next per `TASKS.md` is MCP-002
-(capabilities.search + activation).
+MCP-001 and MCP-002 are both done (see Current milestone above). Next per
+`TASKS.md` is SKL-001 (Skills).
 
 ## Completed milestones
 - Phase 1: full spec-kit reading pass (all `SPEC/`, `ADR/`, `BUILD/`, `TESTING/`,
@@ -231,7 +250,7 @@ asyncio interaction, not an application bug.
 None.
 
 ## Architectural decisions made during implementation
-See `DECISIONS.md` for the full list (D-001 through D-040). Notable ones affecting
+See `DECISIONS.md` for the full list (D-001 through D-041). Notable ones affecting
 what's built so far:
 - D-003/D-004: SQLAlchemy async + plain SQL migrations, schema grows incrementally
   per subsystem milestone rather than all at once.
@@ -246,13 +265,13 @@ what's built so far:
 - D-014: license selection is deferred to the project owner (placeholder in place).
 
 ## What is NOT yet built
-capabilities.search + activation (MCP-002), skills (SKL-001/002), creative
-compute, analytics/benchmarks, the Node daemon, the rest of the WebUI
-(graph/compute/models/creative/assets/analytics/approvals views, full
-three-panel IA, context meter, accessibility audit), TUI feature completion,
-demo mode content, screenshot automation, GitHub Pages site, and marketing
-copy. These are tracked as their own `TASKS.md` entries and proceed in
-dependency order per `BUILD/IMPLEMENTATION_PLAN.md`.
+skills (SKL-001/002), creative compute, analytics/benchmarks, the Node
+daemon, the rest of the WebUI (graph/compute/models/creative/assets/
+analytics/approvals views, full three-panel IA, context meter, accessibility
+audit), TUI feature completion, demo mode content, screenshot automation,
+GitHub Pages site, and marketing copy. These are tracked as their own
+`TASKS.md` entries and proceed in dependency order per
+`BUILD/IMPLEMENTATION_PLAN.md`.
 
 ## Exact commands to run the currently working application
 
@@ -281,7 +300,7 @@ HARNESS_DEMO_MODE=1 uv run harness serve
 
 Test suites:
 ```bash
-uv run pytest tests -q                      # backend: 279 tests
+uv run pytest tests -q                      # backend: 287 tests
 cd web && npm run test                      # web unit: vitest
 cd web && npx playwright test               # web e2e (needs both servers running)
 ```

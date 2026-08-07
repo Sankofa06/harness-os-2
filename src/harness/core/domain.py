@@ -369,6 +369,24 @@ class McpToolIndexEntry(BaseModel):
     trust_class: PermissionClass = "network"
 
 
+CapabilityKind = Literal["native_tool", "mcp_tool"]
+
+
+class SessionActivatedCapability(BaseModel):
+    """Records that a session's `tools.describe` call has pulled one tool's full
+    schema into that session's context going forward (MCP-002). Only ``kind`` +
+    ``ref`` are persisted — ``ref`` is a native tool's name for ``native_tool``,
+    or an `McpToolIndexEntry.id` for ``mcp_tool`` — and the schema itself is
+    always resolved fresh from its source at compile time.
+    """
+
+    id: str
+    session_id: str
+    kind: CapabilityKind
+    ref: str
+    created_at: str = ""
+
+
 class RunMetrics(BaseModel):
     run_id: str
     input_tokens: int | None = None

@@ -39,6 +39,7 @@ PREFIXES: frozenset[str] = frozenset(
         "perm",
         "mcpsrv",
         "mcpidx",
+        "actcap",
     }
 )
 

@@ -332,7 +332,7 @@ Task format: ID — title / description / deps / components / acceptance / tests
 - Desc: `capabilities.search(query)` returns concise candidates across tools/skills/MCP; only selected schemas compiled next call.
 - Deps: MCP-001, CTX-002. Components: mcp, context.
 - Acceptance: DoD "Schema loads only when activated"; budget unaffected until activation.
-- Tests: integration + context regression. Status: TODO
+- Tests: integration + context regression. Status: DONE
 
 ### SKL-001 Skills
 - Desc: skill package format (metadata/SKILL.md/scripts/activation rules/tool requirements/cost estimate); index cheap, body lazy; `/skills`, `/skills/{id}/activate`.
