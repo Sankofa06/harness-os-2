@@ -4,14 +4,16 @@ _Last updated: 2026-08-06_
 
 ## Current milestone
 Milestones 1 (kernel) and 2 (control plane) are fully done. Milestone 3 (language
-compute): every required v1 adapter from SPEC/PROVIDER_MATRIX.md now exists (fake,
-generic OpenAI-compatible, LM Studio, Ollama, OpenRouter, OpenAI, Anthropic, Gemini).
-Remaining in this milestone: LP-008 (model profiles + placement policy) and LP-009
-(instance lifecycle API) — none of these adapters are wired into the app's live
-`ProviderRegistry` or reachable from the API/run loop yet; only the fake provider is.
+compute): every required v1 adapter exists (fake, generic OpenAI-compatible, LM
+Studio, Ollama, OpenRouter, OpenAI, Anthropic, Gemini), and Model Profiles +
+placement-policy resolution (LP-008) are done. Only LP-009 (instance lifecycle API)
+remains — until it lands, none of the real adapters are wired into the app's live
+`ProviderRegistry` or reachable from a running session; only the fake provider is.
 
 ## Active task
-None in flight. Next up per `TASKS.md`: LP-008 (model profiles + placement policy).
+None in flight. Next up per `TASKS.md`: LP-009 (instance lifecycle API) — this is
+what will let a session actually use LM Studio/Ollama/OpenRouter/OpenAI/Anthropic/
+Gemini instead of only the fake provider.
 
 ## Completed milestones
 - Phase 1: full spec-kit reading pass (all `SPEC/`, `ADR/`, `BUILD/`, `TESTING/`,
@@ -55,7 +57,7 @@ None in flight. Next up per `TASKS.md`: LP-008 (model profiles + placement polic
   SPEC/HOSTS_AND_NODE.md, `host_capabilities` table).
 
 ## Known failures
-None functionally. 123/123 backend tests pass, 2/2 web unit tests pass, 1/1 Playwright
+None functionally. 139/139 backend tests pass, 2/2 web unit tests pass, 1/1 Playwright
 e2e test passes. `ruff check`, `ruff format --check`, and `mypy --strict` are clean on
 `src/harness`. `eslint`, `vitest`, and `tsc -b && vite build` are clean on `web/`.
 Cosmetic: some test runs emit a `PytestUnhandledThreadExceptionWarning` from an
@@ -82,11 +84,11 @@ what's built so far:
 - D-014: license selection is deferred to the project owner (placeholder in place).
 
 ## What is NOT yet built
-Model profiles/placement policy and the instance lifecycle API (LP-008/LP-009) that
-would let the API actually select/load/unload models through the real adapters
-(they exist and are unit-tested against fixtures, but nothing yet constructs them
-from persisted `ProviderConfig` rows into the live `ProviderRegistry` a session can
-use), SSH hosts/workspaces execution (host *records* exist
+The instance lifecycle API (LP-009) that would let the API actually select/load/
+unload models through the real adapters (they exist and are unit-tested against
+fixtures, but nothing yet constructs them from persisted `ProviderConfig` rows into
+the live `ProviderRegistry` a session can use), SSH hosts/workspaces execution (host
+*records* exist
 via CP-004, but nothing yet connects to one), tools/permissions engine beyond the
 stub, MCP/skills,
 creative compute, analytics/benchmarks, the Node daemon, the rest of the WebUI
@@ -123,7 +125,7 @@ HARNESS_DEMO_MODE=1 uv run harness serve
 
 Test suites:
 ```bash
-uv run pytest tests -q                      # backend: 123 tests
+uv run pytest tests -q                      # backend: 139 tests
 cd web && npm run test                      # web unit: vitest
 cd web && npx playwright test               # web e2e (needs both servers running)
 ```

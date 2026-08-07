@@ -1,9 +1,9 @@
 import pytest
 
-from harness.core.domain import Host, ProviderConfig
+from harness.core.domain import Host, ModelProfile, ProviderConfig
 from harness.core.errors import ConflictError, NotFoundError
 from harness.core.ids import new_id
-from harness.persistence.repos_control_plane import HostRepo, ProviderConfigRepo
+from harness.persistence.repos_control_plane import HostRepo, ModelProfileRepo, ProviderConfigRepo
 
 
 @pytest.mark.asyncio
@@ -85,3 +85,35 @@ async def test_host_duplicate_display_name_rejected(db) -> None:
     await repo.create(Host(id=new_id("host"), display_name="dup-host", kind="local"))
     with pytest.raises(ConflictError):
         await repo.create(Host(id=new_id("host"), display_name="dup-host", kind="local"))
+
+
+@pytest.mark.asyncio
+async def test_model_profile_round_trip(db) -> None:
+    providers = ProviderConfigRepo(db)
+    provider = await providers.create(
+        ProviderConfig(id=new_id("prov"), type="fake", display_name="profile-repo-provider")
+    )
+    repo = ModelProfileRepo(db)
+    profile = await repo.create(
+        ModelProfile(
+            id=new_id("prof"),
+            name="repo-profile",
+            provider_config_id=provider.id,
+            model_id="fake-mini",
+            settings={"common": {"temperature": 0.3}},
+            load_policy="always_loaded",
+            placement_policy="prefer-fastest",
+            tool_capability_policy="required",
+        )
+    )
+    fetched = await repo.get(profile.id)
+    assert fetched.load_policy == "always_loaded"
+    assert fetched.placement_policy == "prefer-fastest"
+    assert fetched.settings["common"]["temperature"] == 0.3
+
+    listed = await repo.list()
+    assert profile.id in {p.id for p in listed}
+
+    await repo.delete(profile.id)
+    with pytest.raises(NotFoundError):
+        await repo.get(profile.id)

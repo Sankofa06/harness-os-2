@@ -31,6 +31,8 @@ names; file paths may evolve. Status: PLANNED / IMPLEMENTED / PASSING.
 | Anthropic native adapter (system field, max_tokens, SSE event stream) | `tests/providers/test_anthropic.py` | PASSING |
 | Gemini native adapter (role mapping, usageMetadata) | `tests/providers/test_gemini.py` | PASSING |
 | Cloud adapters wired with secret refs (not raw keys) at runtime | — | PLANNED (needs LP-009 instance lifecycle API) |
+| Model profile resolves to provider+model+settings | `tests/persistence/test_control_plane_repos.py`, `tests/api/test_model_profiles.py` | PASSING |
+| Placement policy respects manual/auto/prefer-*/telemetry-required semantics | `tests/unit/test_placement.py` | PASSING |
 | Settings-schema validation (namespaced common/provider.*, passthrough opt-in) | `tests/unit/test_settings_schema.py` | PASSING |
 | Settings schemas render in UI | `web` Playwright `models-settings.spec.ts` | PLANNED |
 | Uniform control-plane descriptor (identity/capabilities/state/settings/health/events) | `tests/unit/test_control_plane.py`, `tests/api/test_system.py::test_capabilities_lists_fake_provider` | PASSING |

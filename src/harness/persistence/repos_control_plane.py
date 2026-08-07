@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from harness.core.domain import Host, ProviderConfig
+from harness.core.domain import Host, ModelProfile, ProviderConfig
 from harness.core.errors import ConflictError, NotFoundError
 from harness.persistence.db import Database
 
@@ -136,6 +136,63 @@ class HostRepo:
             known_host_fingerprint=row["known_host_fingerprint"],
             capabilities=[c["capability"] for c in capability_rows],
         )
+
+
+class ModelProfileRepo:
+    def __init__(self, db: Database) -> None:
+        self._db = db
+
+    async def create(self, profile: ModelProfile) -> ModelProfile:
+        if await self._db.fetch_one(
+            "SELECT id FROM model_profiles WHERE name = :n", {"n": profile.name}
+        ):
+            raise ConflictError(f"model profile name already exists: {profile.name}")
+        await self._db.execute(
+            "INSERT INTO model_profiles (id, name, provider_config_id, model_id, "
+            "settings_json, load_policy, placement_policy, tool_capability_policy) "
+            "VALUES (:id, :name, :provider_config_id, :model_id, :settings_json, "
+            ":load_policy, :placement_policy, :tool_capability_policy)",
+            {
+                "id": profile.id,
+                "name": profile.name,
+                "provider_config_id": profile.provider_config_id,
+                "model_id": profile.model_id,
+                "settings_json": json.dumps(profile.settings),
+                "load_policy": profile.load_policy,
+                "placement_policy": profile.placement_policy,
+                "tool_capability_policy": profile.tool_capability_policy,
+            },
+        )
+        return profile
+
+    async def get(self, profile_id: str) -> ModelProfile:
+        row = await self._db.fetch_one(
+            "SELECT * FROM model_profiles WHERE id = :id", {"id": profile_id}
+        )
+        if row is None:
+            raise NotFoundError(f"model profile not found: {profile_id}")
+        return _model_profile(row)
+
+    async def list(self) -> list[ModelProfile]:
+        rows = await self._db.fetch_all("SELECT * FROM model_profiles ORDER BY name")
+        return [_model_profile(r) for r in rows]
+
+    async def delete(self, profile_id: str) -> None:
+        await self.get(profile_id)
+        await self._db.execute("DELETE FROM model_profiles WHERE id = :id", {"id": profile_id})
+
+
+def _model_profile(row: Any) -> ModelProfile:
+    return ModelProfile(
+        id=row["id"],
+        name=row["name"],
+        provider_config_id=row["provider_config_id"],
+        model_id=row["model_id"],
+        settings=json.loads(row["settings_json"]),
+        load_policy=row["load_policy"],
+        placement_policy=row["placement_policy"],
+        tool_capability_policy=row["tool_capability_policy"],
+    )
 
 
 def _provider_config(row: Any) -> ProviderConfig:

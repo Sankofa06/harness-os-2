@@ -173,3 +173,22 @@ Format: decision / reason / alternatives / consequences.
 - Consequences: all three adapters' fixture tests passed on the first run against the
   verified shapes, which is corroborating evidence the researched details were
   accurate rather than just internally self-consistent.
+
+## D-019 — Placement policies needing telemetry fail loudly rather than guessing
+- Decision: `resolve_placement()` (LP-008) is a pure function taking explicit
+  `Host` candidates and optional per-host `HostSignal`s. `prefer-fastest`,
+  `prefer-lowest-pressure`, and `prefer-lowest-cost` raise `ValidationFailedError`
+  when no candidate has the needed signal, rather than falling back to an arbitrary
+  choice. `auto` (opt-in only, per SPEC/PROVIDER_MATRIX.md and HOSTS_AND_NODE.md) and
+  `prefer-loaded` degrade to "first candidate" only when no candidate reports
+  `model_loaded`, which is an honest no-preference outcome, not a fake optimization.
+- Reason: ADR 0003 (capability/schema adapters, no fake parity) applies just as much
+  to scheduling as to provider adapters — a "fastest" pick with no throughput data
+  would be indistinguishable from a coin flip presented as if it were principled.
+  Host telemetry (ANA-002) doesn't exist yet, so the signal-dependent policies simply
+  cannot be honestly satisfied today.
+- Consequences: `load_policy` and `tool_capability_policy` values on `ModelProfile`
+  aren't enumerated by SPEC/PROVIDER_MATRIX.md (only `placement_policy` is); the
+  three-value sets chosen (`manual`/`always_loaded`/`on_demand` and
+  `inherit`/`disabled`/`required`) are this implementation's minimal reasonable set,
+  documented here since the spec doesn't pin them down.

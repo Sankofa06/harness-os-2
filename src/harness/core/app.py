@@ -34,7 +34,7 @@ from harness.persistence.repos import (
     SessionRepo,
     TeamRepo,
 )
-from harness.persistence.repos_control_plane import HostRepo, ProviderConfigRepo
+from harness.persistence.repos_control_plane import HostRepo, ModelProfileRepo, ProviderConfigRepo
 from harness.persistence.repos_jobs import JobRepo
 from harness.providers.language.fake import FakeProvider
 from harness.providers.language.registry import ProviderRegistry
@@ -63,6 +63,7 @@ class Application:
     job_manager: JobManager
     provider_configs: ProviderConfigRepo
     hosts: HostRepo
+    model_profiles: ModelProfileRepo
     providers: ProviderRegistry
     compiler: ContextCompiler
     api_token: str
@@ -120,6 +121,7 @@ async def create_application(config: HarnessConfig | None = None) -> Application
     job_manager = JobManager(repo=jobs, bus=bus)
     provider_configs = ProviderConfigRepo(db)
     hosts = HostRepo(db)
+    model_profiles = ModelProfileRepo(db)
 
     await seed_agents(roles, personas)
 
@@ -146,6 +148,7 @@ async def create_application(config: HarnessConfig | None = None) -> Application
         job_manager=job_manager,
         provider_configs=provider_configs,
         hosts=hosts,
+        model_profiles=model_profiles,
         providers=providers,
         compiler=compiler,
         api_token=token,

@@ -48,6 +48,32 @@ class Host(BaseModel):
     capabilities: list[str] = Field(default_factory=list)
 
 
+LoadPolicy = Literal["manual", "always_loaded", "on_demand"]
+PlacementPolicy = Literal[
+    "manual",
+    "auto",
+    "prefer-loaded",
+    "prefer-local",
+    "prefer-fastest",
+    "prefer-lowest-pressure",
+    "prefer-lowest-cost",
+]
+ToolCapabilityPolicy = Literal["inherit", "disabled", "required"]
+
+
+class ModelProfile(BaseModel):
+    """A reusable provider+model+settings+policy bundle (SPEC/PROVIDER_MATRIX.md)."""
+
+    id: str
+    name: str
+    provider_config_id: str
+    model_id: str
+    settings: dict[str, Any] = Field(default_factory=dict)
+    load_policy: LoadPolicy = "on_demand"
+    placement_policy: PlacementPolicy = "manual"
+    tool_capability_policy: ToolCapabilityPolicy = "inherit"
+
+
 class Role(BaseModel):
     id: str
     name: str

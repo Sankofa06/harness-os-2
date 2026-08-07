@@ -188,7 +188,7 @@ Task format: ID — title / description / deps / components / acceptance / tests
 - Desc: model_profiles table; policies manual/auto/prefer-loaded/local/fastest/lowest-pressure/lowest-cost; auto opt-in only.
 - Deps: LP-001, CP-004. Components: providers, core.
 - Acceptance: profile resolves to provider+model+settings; placement respects policy.
-- Tests: unit placement tests. Status: TODO
+- Tests: unit placement tests. Status: DONE
 
 ### LP-009 Instance lifecycle API
 - Desc: `/language/models*`, `/language/instances*` incl. load/unload/settings-schema/settings; long ops as Jobs.
