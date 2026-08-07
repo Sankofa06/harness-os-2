@@ -4,8 +4,25 @@ _Last updated: 2026-08-07_
 
 ## Current milestone
 Milestones 1 (kernel), 2 (control plane), 3 (language compute), 4 (execution),
-and 5 (agent runtime) are all fully done. See the end of this section (AGT-006)
-for the most recently completed work; Milestone 6 (MCP + Skills) is next.
+and 5 (agent runtime) are all fully done. Milestone 6 (MCP + Skills) is in
+progress: MCP-001 (lazy MCP index) is done — see the note below. Next up in
+Milestone 6 is MCP-002 (capabilities.search + activation).
+
+MCP-001: `harness.mcp.client.McpClient` is a hand-rolled JSON-RPC 2.0 client
+against the MCP spec's Streamable HTTP transport (a single POST endpoint),
+implementing `initialize` and `tools/list` — the stdio transport is explicitly
+declared unsupported rather than faked (ADR 0003). `POST /mcp/servers/{id}/
+index` connects to a registered server and replaces its compact tool index
+(`mcp_tool_index`: name/description/estimated-schema-token-cost/trust-class)
+without ever loading a full JSON Schema — schemas are fetched lazily and only
+per-tool via `GET /mcp/tools/{entry_id}/schema`. Every discovered tool defaults
+to the `network` permission class (PERM-001's `ask` default), since the
+protocol carries no danger-level metadata of its own. `McpServer.
+secret_ref_id`, when set, resolves through the same just-in-time pattern as
+`hosts.resolve.build_ssh_host` (SEC-001) and is sent as `Authorization: Bearer
+<token>` on every request — proven with a real local fixture MCP server
+(`tests/mcp/fixtures.py`, via `uvicorn.Server`) that actually rejects requests
+missing the correct token, not just a client-side assertion. See D-040.
 
 `SSHHost` (asyncssh-based) does test-connection/
 exec-stream/cancel/sftp read-write-list-move-delete against a real local SSH server
@@ -155,8 +172,8 @@ from persisted Runs/ToolRuns on every request rather than a separately
 maintained structure, so it can't drift from what actually happened.
 
 ## Active task
-None in flight. Milestone 5 (Agent runtime) is fully done. Next per `TASKS.md`
-is Milestone 6 (MCP + Skills).
+MCP-001 is done (see Current milestone above). Next per `TASKS.md` is MCP-002
+(capabilities.search + activation).
 
 ## Completed milestones
 - Phase 1: full spec-kit reading pass (all `SPEC/`, `ADR/`, `BUILD/`, `TESTING/`,
@@ -214,7 +231,7 @@ asyncio interaction, not an application bug.
 None.
 
 ## Architectural decisions made during implementation
-See `DECISIONS.md` for the full list (D-001 through D-039). Notable ones affecting
+See `DECISIONS.md` for the full list (D-001 through D-040). Notable ones affecting
 what's built so far:
 - D-003/D-004: SQLAlchemy async + plain SQL migrations, schema grows incrementally
   per subsystem milestone rather than all at once.
@@ -229,12 +246,13 @@ what's built so far:
 - D-014: license selection is deferred to the project owner (placeholder in place).
 
 ## What is NOT yet built
-MCP/skills, creative compute,
-analytics/benchmarks, the Node daemon, the rest of the WebUI (graph/compute/models/
-creative/assets/analytics/approvals views, full three-panel IA, context meter,
-accessibility audit), TUI feature completion, demo mode content, screenshot
-automation, GitHub Pages site, and marketing copy. These are tracked as their own
-`TASKS.md` entries and proceed in dependency order per `BUILD/IMPLEMENTATION_PLAN.md`.
+capabilities.search + activation (MCP-002), skills (SKL-001/002), creative
+compute, analytics/benchmarks, the Node daemon, the rest of the WebUI
+(graph/compute/models/creative/assets/analytics/approvals views, full
+three-panel IA, context meter, accessibility audit), TUI feature completion,
+demo mode content, screenshot automation, GitHub Pages site, and marketing
+copy. These are tracked as their own `TASKS.md` entries and proceed in
+dependency order per `BUILD/IMPLEMENTATION_PLAN.md`.
 
 ## Exact commands to run the currently working application
 
@@ -263,7 +281,7 @@ HARNESS_DEMO_MODE=1 uv run harness serve
 
 Test suites:
 ```bash
-uv run pytest tests -q                      # backend: 265 tests
+uv run pytest tests -q                      # backend: 279 tests
 cd web && npm run test                      # web unit: vitest
 cd web && npx playwright test               # web e2e (needs both servers running)
 ```

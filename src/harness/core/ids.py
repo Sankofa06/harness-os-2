@@ -37,6 +37,8 @@ PREFIXES: frozenset[str] = frozenset(
         "sec",
         "node",
         "perm",
+        "mcpsrv",
+        "mcpidx",
     }
 )
 

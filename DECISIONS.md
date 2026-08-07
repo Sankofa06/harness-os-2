@@ -667,3 +667,33 @@ Format: decision / reason / alternatives / consequences.
   ToolRun count (no pagination yet) — acceptable for now since sessions are
   bounded by realistic conversation lengths; revisit if a session's graph ever
   needs to represent an unbounded history.
+
+## D-040 — MCP client: Streamable HTTP only, hand-rolled, `network` trust default, SEC-001 bearer auth
+- Decision: `harness.mcp.client.McpClient` (MCP-001) implements only the MCP
+  spec's Streamable HTTP transport (a single JSON-RPC 2.0 POST endpoint) and only
+  the two calls MCP-001 needs, `initialize` and `tools/list`. The stdio transport
+  (locally-launched servers over stdin/stdout) is not implemented — declared
+  unsupported rather than faked (ADR 0003), matching how every other
+  capability-gapped adapter in this codebase behaves. The client is hand-rolled
+  against httpx rather than built on the official `mcp` Python SDK, to stay
+  consistent with every other provider/engine adapter (OpenAI-compatible, LM
+  Studio, Ollama, Anthropic, Gemini), none of which pull in a vendor SDK. Every
+  tool discovered via `tools/list` defaults to the `network` permission class —
+  the MCP protocol carries no danger-level metadata, and any call to an external
+  MCP server is at minimum outbound network I/O to a third party, so `network`
+  (PERM-001 default policy: `ask`) is the conservative, honest default rather
+  than guessing per-tool risk from its name or description. `McpServer.
+  secret_ref_id`, when set, resolves through the same just-in-time pattern as
+  `harness.hosts.resolve.build_ssh_host` (SEC-001) — `harness.mcp.indexing.
+  index_server` resolves it to a raw value via `SecretRefRepo`/`SecretStore` and
+  passes it to `McpClient` as `auth_token`, which sends it as `Authorization:
+  Bearer <token>` on every request; the token is never persisted or logged.
+- Reason: MCP-001's TASKS.md entry lists `Deps: TOOL-001, SEC-001` — the SEC-001
+  dependency needed to be a real, tested integration (many real MCP servers
+  require auth) rather than left unaddressed because the vertical slice didn't
+  strictly need it to pass tests.
+- Consequences: an MCP server behind stdio-only tooling cannot be registered
+  until a stdio transport is added as new, separately-declared capability — not
+  silently unsupported. Auth is bearer-token-only for now; an MCP server needing
+  a different auth scheme (OAuth, mTLS) is likewise out of scope until a real
+  use case needs it.

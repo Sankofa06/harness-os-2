@@ -24,6 +24,8 @@ async def test_migrate_creates_schema_and_is_idempotent() -> None:
         "permission_decisions",
         "artifacts",
         "session_transcript_state",
+        "mcp_servers",
+        "mcp_tool_index",
     ):
         tables = await db.fetch_all(
             "SELECT name FROM sqlite_master WHERE type = 'table' AND name = :t", {"t": table}

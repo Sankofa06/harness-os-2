@@ -326,7 +326,7 @@ Task format: ID — title / description / deps / components / acceptance / tests
 - Desc: mcp_servers + mcp_tool_index (server, tool, one-line desc, est. schema tokens, trust class); `/mcp/servers`, `/mcp/tools/index`; server lifecycle.
 - Deps: TOOL-001, SEC-001. Components: mcp.
 - Acceptance: adding server indexes tools without loading schemas.
-- Tests: fixture MCP server tests. Status: TODO
+- Tests: fixture MCP server tests. Status: DONE
 
 ### MCP-002 capabilities.search + activation
 - Desc: `capabilities.search(query)` returns concise candidates across tools/skills/MCP; only selected schemas compiled next call.

@@ -78,7 +78,7 @@ names; file paths may evolve. Status: PLANNED / IMPLEMENTED / PASSING.
 
 ## MCP / skills / tools
 | Tool lifecycle (validate→permission→execute→capture→events); runs recorded in tool_runs | `tests/unit/test_tool_lifecycle.py`, `tests/api/test_tools.py` | PASSING |
-| Add MCP server; compact index; lazy schema | `tests/mcp/test_lazy_index.py` | PLANNED |
+| Add MCP server; compact index; lazy schema; bearer-token auth via secret_ref_id (SEC-001) | `tests/mcp/test_client.py`, `tests/api/test_mcp.py` vs real local fixture server | PASSING |
 | Skill metadata w/o body load | `tests/skills/test_lazy_skills.py` | PLANNED |
 | Superpower toggles | `tests/skills/test_superpowers.py` | PLANNED |
 | Permission ask/allow/deny; ask flow blocks until approval; decisions logged | `tests/api/test_permissions.py` | PASSING |

@@ -337,6 +337,38 @@ class Artifact(BaseModel):
     created_at: str = ""
 
 
+class McpServer(BaseModel):
+    """A registered MCP server (MCP-001, SPEC/MCP_SKILLS_TOOLS.md). Only the
+    Streamable HTTP transport is supported — see `harness.mcp.client.McpClient`.
+    ``secret_ref_id``, when set, resolves to a bearer token sent as
+    ``Authorization: Bearer <token>`` on every request (SEC-001) — many real MCP
+    servers require auth; the value itself is never stored on this record.
+    """
+
+    id: str
+    display_name: str
+    base_url: str
+    secret_ref_id: str | None = None
+    enabled: bool = True
+    last_indexed_at: str | None = None
+    created_at: str = ""
+
+
+class McpToolIndexEntry(BaseModel):
+    """One tool's compact index entry (MCP-001): everything needed to decide
+    *whether* to activate a tool without loading its full JSON Schema. The full
+    schema is fetched separately, on activation (MCP-002), via
+    `McpIndexRepo.get_schema`.
+    """
+
+    id: str
+    server_id: str
+    tool_name: str
+    description: str = ""
+    estimated_schema_tokens: int = 0
+    trust_class: PermissionClass = "network"
+
+
 class RunMetrics(BaseModel):
     run_id: str
     input_tokens: int | None = None

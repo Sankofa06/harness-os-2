@@ -42,6 +42,7 @@ from harness.persistence.repos_artifacts import ArtifactRepo
 from harness.persistence.repos_context import TranscriptStateRepo
 from harness.persistence.repos_control_plane import HostRepo, ModelProfileRepo, ProviderConfigRepo
 from harness.persistence.repos_jobs import JobRepo
+from harness.persistence.repos_mcp import McpIndexRepo, McpServerRepo
 from harness.persistence.repos_model_instances import ModelInstanceRepo
 from harness.persistence.repos_permissions import PermissionDecisionRepo, PermissionPolicyRepo
 from harness.persistence.repos_tools import ToolRunRepo
@@ -94,6 +95,8 @@ class Application:
     artifact_blobs: ArtifactBlobStore
     transcript_state: TranscriptStateRepo
     run_registry: RunRegistry
+    mcp_servers: McpServerRepo
+    mcp_index: McpIndexRepo
     compiler: ContextCompiler
     api_token: str
     system_binding: Binding = field(default_factory=lambda: SYSTEM_DEFAULT_BINDING)
@@ -191,6 +194,8 @@ async def create_application(config: HarnessConfig | None = None) -> Application
     artifact_blobs = ArtifactBlobStore(config.data_dir / "artifacts")
     transcript_state = TranscriptStateRepo(db)
     run_registry = RunRegistry()
+    mcp_servers = McpServerRepo(db)
+    mcp_index = McpIndexRepo(db)
 
     compiler = ContextCompiler(HeuristicEstimator(), config.context)
 
@@ -226,6 +231,8 @@ async def create_application(config: HarnessConfig | None = None) -> Application
         artifact_blobs=artifact_blobs,
         transcript_state=transcript_state,
         run_registry=run_registry,
+        mcp_servers=mcp_servers,
+        mcp_index=mcp_index,
         compiler=compiler,
         api_token=token,
     )
