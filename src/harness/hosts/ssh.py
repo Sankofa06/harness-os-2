@@ -11,6 +11,7 @@ AGENTS.md's "no shell string concatenation for SSH execution").
 from __future__ import annotations
 
 import asyncio
+import posixpath
 import shlex
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
@@ -20,6 +21,7 @@ import asyncssh
 
 from harness.core.domain import Host
 from harness.core.errors import PermissionDeniedError, ProviderError
+from harness.hosts.path_safety import canonicalize_and_check, resolve_and_check
 
 
 @dataclass
@@ -44,6 +46,14 @@ class SSHHost:
     """One SSH connection target. Stateless between calls — each operation opens and
     closes its own connection, since Harness hosts are used intermittently rather than
     kept in a persistent session pool for this v1.
+
+    Every file operation (and `exec_stream`'s ``cwd``, when given) is checked against
+    ``host.workspace_roots`` before touching the network (HOST-002, SPEC/HOSTS_AND_
+    NODE.md). File operations get a second, remote-resolved check via SFTP
+    ``realpath()`` to catch a symlink inside an allowed root pointing outside it —
+    something a purely lexical check can't see. Bare `exec_stream` calls with no
+    ``cwd`` are intentionally unscoped: workspace roots bound *file* access, not
+    general command execution (a separate permission, PermissionClass.EXECUTE).
     """
 
     def __init__(
@@ -63,6 +73,7 @@ class SSHHost:
         self._password = password
         self._client_keys = [asyncssh.import_private_key(private_key)] if private_key else None
         self._expected_fingerprint = host.known_host_fingerprint
+        self._workspace_roots = host.workspace_roots
 
     async def _connect(self) -> asyncssh.SSHClientConnection:
         try:
@@ -109,6 +120,7 @@ class SSHHost:
         """Run argv on the remote host, streaming stdout/stderr as they arrive."""
         command = shlex.join(argv)
         if cwd:
+            cwd = canonicalize_and_check(cwd, self._workspace_roots)
             command = f"cd {shlex.quote(cwd)} && {command}"
 
         conn = await self._connect()
@@ -122,29 +134,42 @@ class SSHHost:
             conn.close()
 
     async def read_file(self, path: str) -> bytes:
+        canonicalize_and_check(path, self._workspace_roots)
         conn = await self._connect()
         try:
-            async with conn.start_sftp_client() as sftp, sftp.open(path, "rb") as f:
-                return await f.read()
+            async with conn.start_sftp_client() as sftp:
+                await resolve_and_check(sftp, path, self._workspace_roots)
+                async with sftp.open(path, "rb") as f:
+                    return await f.read()
         except (OSError, asyncssh.SFTPError) as exc:
             raise ProviderError(f"sftp read failed for {path}: {exc}") from exc
         finally:
             conn.close()
 
     async def write_file(self, path: str, data: bytes) -> None:
+        canonicalize_and_check(path, self._workspace_roots)
         conn = await self._connect()
         try:
-            async with conn.start_sftp_client() as sftp, sftp.open(path, "wb") as f:
-                await f.write(data)
+            async with conn.start_sftp_client() as sftp:
+                # A not-yet-existing file has no real path to resolve; check the
+                # deepest already-existing ancestor instead so writes creating new
+                # files still get a remote-resolved (symlink-aware) containment check.
+                await resolve_and_check(
+                    sftp, await _deepest_existing_ancestor(sftp, path), self._workspace_roots
+                )
+                async with sftp.open(path, "wb") as f:
+                    await f.write(data)
         except (OSError, asyncssh.SFTPError) as exc:
             raise ProviderError(f"sftp write failed for {path}: {exc}") from exc
         finally:
             conn.close()
 
     async def list_dir(self, path: str) -> list[SftpEntry]:
+        canonicalize_and_check(path, self._workspace_roots)
         conn = await self._connect()
         try:
             async with conn.start_sftp_client() as sftp:
+                await resolve_and_check(sftp, path, self._workspace_roots)
                 entries = []
                 for name in await sftp.listdir(path):
                     if name in (".", ".."):
@@ -165,9 +190,16 @@ class SSHHost:
             conn.close()
 
     async def mkdir(self, path: str) -> None:
+        canonicalize_and_check(path, self._workspace_roots)
         conn = await self._connect()
         try:
             async with conn.start_sftp_client() as sftp:
+                # `path` itself may not exist yet (and makedirs can create several
+                # new levels); check the deepest already-existing ancestor's real
+                # path rather than `path` itself.
+                await resolve_and_check(
+                    sftp, await _deepest_existing_ancestor(sftp, path), self._workspace_roots
+                )
                 await sftp.makedirs(path, exist_ok=True)
         except (OSError, asyncssh.SFTPError) as exc:
             raise ProviderError(f"sftp mkdir failed for {path}: {exc}") from exc
@@ -175,9 +207,15 @@ class SSHHost:
             conn.close()
 
     async def move(self, src: str, dst: str) -> None:
+        canonicalize_and_check(src, self._workspace_roots)
+        canonicalize_and_check(dst, self._workspace_roots)
         conn = await self._connect()
         try:
             async with conn.start_sftp_client() as sftp:
+                await resolve_and_check(sftp, src, self._workspace_roots)
+                await resolve_and_check(
+                    sftp, await _deepest_existing_ancestor(sftp, dst), self._workspace_roots
+                )
                 await sftp.rename(src, dst)
         except (OSError, asyncssh.SFTPError) as exc:
             raise ProviderError(f"sftp move failed for {src} -> {dst}: {exc}") from exc
@@ -185,14 +223,33 @@ class SSHHost:
             conn.close()
 
     async def delete(self, path: str) -> None:
+        canonicalize_and_check(path, self._workspace_roots)
         conn = await self._connect()
         try:
             async with conn.start_sftp_client() as sftp:
+                await resolve_and_check(sftp, path, self._workspace_roots)
                 await sftp.remove(path)
         except (OSError, asyncssh.SFTPError) as exc:
             raise ProviderError(f"sftp delete failed for {path}: {exc}") from exc
         finally:
             conn.close()
+
+
+async def _deepest_existing_ancestor(sftp: asyncssh.SFTPClient, path: str) -> str:
+    """Walk up from ``path`` to the nearest ancestor that actually exists remotely.
+
+    Used to containment-check a not-yet-created path (a new file, a new directory
+    tree) via its closest real anchor, since SFTP `realpath()` needs something that
+    already exists.
+    """
+    candidate = path
+    while True:
+        if await sftp.exists(candidate):
+            return candidate
+        parent = posixpath.dirname(candidate)
+        if parent == candidate:
+            return candidate  # reached "/" without finding anything that exists
+        candidate = parent
 
 
 async def _stream_process(process: asyncssh.SSHClientProcess[str]) -> AsyncIterator[ExecChunk]:

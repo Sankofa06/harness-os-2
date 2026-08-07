@@ -261,3 +261,36 @@ Format: decision / reason / alternatives / consequences.
   local SSH server and asserts it comes back as inert text, not executed.
 - Consequences: any future caller building argv must never pre-format a shell string
   itself — `exec_stream` owns quoting for the whole call.
+
+## D-024 — Path safety is two-layer containment built into SSHHost, not a wrapper
+- Decision: `harness.hosts.path_safety` exposes two functions rather than a class:
+  `canonicalize_and_check(path, roots)` (pure, lexical POSIX `normpath` + prefix
+  containment check, no I/O) and `resolve_and_check(sftp, path, roots)` (calls the
+  first, then re-checks containment against the SFTP `realpath()`-resolved path).
+  `SSHHost` calls the lexical check on every path-taking method (and on
+  `exec_stream`'s `cwd`, when given) before opening any connection, and the
+  remote-resolved check inside every SFTP operation once a client is already open.
+  For paths that may not exist yet (a new file being written, a new nested directory
+  tree from `mkdir`), a `_deepest_existing_ancestor()` helper walks up the path to
+  the nearest ancestor SFTP reports as existing and resolves *that* instead, since
+  `realpath()` needs something real to resolve against.
+- Reason: path resolution happens on the *remote* host, so a purely lexical check
+  can't see a symlink inside an allowed root that points outside it — only asking
+  the remote host to resolve the real path closes that gap (proven by
+  `test_read_file_via_symlink_escaping_root_rejected`, which creates a real symlink
+  escaping the allowed root and asserts it's rejected, not just asserted lexically).
+  Built directly into `SSHHost` rather than as a separate decorator/wrapper class to
+  avoid duplicating connection-management and SFTP-client-lifecycle code across two
+  layers; `path_safety` itself stays framework-free (a `Protocol` for the one SFTP
+  method it needs) so it has no dependency on `asyncssh` connection setup and can be
+  unit-tested with a fake in `tests/security/test_path_safety.py`. Fails closed: an
+  empty `workspace_roots` list rejects every path rather than defaulting to
+  unrestricted access, since an unconfigured host is the most common accidental
+  misconfiguration and the least safe default to interpret permissively.
+- Consequences: bare `exec_stream` calls with no `cwd` remain intentionally
+  unscoped by workspace roots — those bound *file* access (SPEC/HOSTS_AND_NODE.md),
+  not general command execution, which is a separate permission
+  (`PermissionClass.EXECUTE`, still enforced at the tool-permission layer once
+  TOOL-002/PERM-001 land). Every `Host` used for real file I/O must have at least
+  one `workspace_roots` entry configured, or every SFTP call on it raises
+  `PermissionDeniedError` immediately.

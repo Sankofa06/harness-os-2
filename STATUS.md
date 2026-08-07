@@ -1,18 +1,25 @@
 # STATUS.md — Current State
 
-_Last updated: 2026-08-06_
+_Last updated: 2026-08-07_
 
 ## Current milestone
 Milestones 1 (kernel), 2 (control plane), and 3 (language compute) are all fully
-done. Milestone 4 (execution) is in progress: HOST-001 (SSH agentless adapter) is
-done — `SSHHost` (asyncssh-based) does test-connection/exec-stream/cancel/sftp
-read-write-list-move-delete against a real local SSH server in tests (not mocks),
-with explicit fingerprint pinning (no known_hosts file) and argv quoting (no shell
-injection, proven by a regression test). `POST /hosts/{id}/test` exercises this live.
+done. Milestone 4 (execution) is in progress: HOST-001 (SSH agentless adapter) and
+HOST-002 (path safety) are done. `SSHHost` (asyncssh-based) does test-connection/
+exec-stream/cancel/sftp read-write-list-move-delete against a real local SSH server
+in tests (not mocks), with explicit fingerprint pinning (no known_hosts file) and
+argv quoting (no shell injection, proven by a regression test). `POST /hosts/{id}/
+test` exercises this live. Every path-taking `SSHHost` method (and `exec_stream`'s
+`cwd`) is now checked against `host.workspace_roots` via a two-layer containment
+check (`harness.hosts.path_safety`): a lexical POSIX normalize-and-check with no
+I/O, then — for file operations — a second check against the SFTP-resolved real
+path, closing the gap where a symlink inside an allowed root points outside it.
+Fails closed with no roots configured. Proven with real filesystem symlinks and
+traversal attempts in tests, not just lexical assertions.
 
 ## Active task
-None in flight. Next up per `TASKS.md`: HOST-002 (path safety — workspace roots,
-canonicalization, traversal rejection).
+None in flight. Next up per `TASKS.md`: WSP-001 (Workspaces — `/workspaces*` API,
+browse/create-folder).
 
 ## Completed milestones
 - Phase 1: full spec-kit reading pass (all `SPEC/`, `ADR/`, `BUILD/`, `TESTING/`,
@@ -56,7 +63,7 @@ canonicalization, traversal rejection).
   SPEC/HOSTS_AND_NODE.md, `host_capabilities` table).
 
 ## Known failures
-None functionally. 163/163 backend tests pass, 2/2 web unit tests pass, 1/1 Playwright
+None functionally. 180/180 backend tests pass, 2/2 web unit tests pass, 1/1 Playwright
 e2e test passes. `ruff check`, `ruff format --check`, and `mypy --strict` are clean on
 `src/harness`. `eslint`, `vitest`, and `tsc -b && vite build` are clean on `web/`.
 Cosmetic: some test runs emit a `PytestUnhandledThreadExceptionWarning` from an
@@ -68,7 +75,7 @@ asyncio interaction, not an application bug.
 None.
 
 ## Architectural decisions made during implementation
-See `DECISIONS.md` for the full list (D-001 through D-023). Notable ones affecting
+See `DECISIONS.md` for the full list (D-001 through D-024). Notable ones affecting
 what's built so far:
 - D-003/D-004: SQLAlchemy async + plain SQL migrations, schema grows incrementally
   per subsystem milestone rather than all at once.
@@ -83,9 +90,8 @@ what's built so far:
 - D-014: license selection is deferred to the project owner (placeholder in place).
 
 ## What is NOT yet built
-HOST-002's path-safety layer (SSHHost itself has no workspace-root enforcement yet —
-it will execute/read/write anywhere the SSH user can), Workspaces (WSP-001/002:
-`/workspaces*`, git operations), the Tool registry/lifecycle and permission engine
+Workspaces (WSP-001/002: `/workspaces*`, git operations), the Tool registry/
+lifecycle and permission engine
 (TOOL-001/002, PERM-001), Artifacts (ART-001), MCP/skills, creative compute,
 analytics/benchmarks, the Node daemon, the rest of the WebUI (graph/compute/models/
 creative/assets/analytics/approvals views, full three-panel IA, context meter,
@@ -120,7 +126,7 @@ HARNESS_DEMO_MODE=1 uv run harness serve
 
 Test suites:
 ```bash
-uv run pytest tests -q                      # backend: 163 tests
+uv run pytest tests -q                      # backend: 180 tests
 cd web && npm run test                      # web unit: vitest
 cd web && npx playwright test               # web e2e (needs both servers running)
 ```

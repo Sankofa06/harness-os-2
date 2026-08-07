@@ -8,7 +8,12 @@ from harness.hosts.ssh import SSHHost
 from tests.hosts.fixtures import RunningSSHServer
 
 
-def _host(server: RunningSSHServer, *, fingerprint: str | None = None) -> Host:
+def _host(
+    server: RunningSSHServer,
+    *,
+    fingerprint: str | None = None,
+    workspace_roots: list[str] | None = None,
+) -> Host:
     return Host(
         id="host_test",
         display_name="test-ssh",
@@ -17,11 +22,20 @@ def _host(server: RunningSSHServer, *, fingerprint: str | None = None) -> Host:
         port=server.port,
         username=server.username,
         known_host_fingerprint=fingerprint,
+        workspace_roots=workspace_roots or [],
     )
 
 
-def _ssh_host(server: RunningSSHServer, *, fingerprint: str | None = None) -> SSHHost:
-    return SSHHost(_host(server, fingerprint=fingerprint), password=server.password)
+def _ssh_host(
+    server: RunningSSHServer,
+    *,
+    fingerprint: str | None = None,
+    workspace_roots: list[str] | None = None,
+) -> SSHHost:
+    return SSHHost(
+        _host(server, fingerprint=fingerprint, workspace_roots=workspace_roots),
+        password=server.password,
+    )
 
 
 @pytest.mark.asyncio
@@ -87,10 +101,20 @@ async def test_exec_stream_quotes_arguments_safely(ssh_server: RunningSSHServer)
 
 @pytest.mark.asyncio
 async def test_exec_stream_respects_cwd(ssh_server: RunningSSHServer) -> None:
-    ssh_host = _ssh_host(ssh_server)
+    ssh_host = _ssh_host(ssh_server, workspace_roots=["/tmp"])
     chunks = [c async for c in ssh_host.exec_stream(["pwd"], cwd="/tmp")]
     stdout = "".join(c.data for c in chunks if c.stream == "stdout")
     assert stdout.strip() == "/tmp"
+
+
+@pytest.mark.asyncio
+async def test_exec_stream_cwd_outside_workspace_roots_rejected(
+    ssh_server: RunningSSHServer,
+) -> None:
+    ssh_host = _ssh_host(ssh_server, workspace_roots=["/tmp/allowed"])
+    with pytest.raises(PermissionDeniedError):
+        async for _ in ssh_host.exec_stream(["pwd"], cwd="/etc"):
+            pass
 
 
 @pytest.mark.asyncio
@@ -111,7 +135,7 @@ async def test_exec_stream_can_be_canceled(ssh_server: RunningSSHServer) -> None
 async def test_sftp_write_read_list_move_delete_round_trip(
     ssh_server: RunningSSHServer, tmp_path
 ) -> None:
-    ssh_host = _ssh_host(ssh_server)
+    ssh_host = _ssh_host(ssh_server, workspace_roots=[str(tmp_path)])
     base = str(tmp_path)
     file_path = f"{base}/greeting.txt"
 
@@ -132,8 +156,57 @@ async def test_sftp_write_read_list_move_delete_round_trip(
 
 @pytest.mark.asyncio
 async def test_mkdir_creates_nested_directories(ssh_server: RunningSSHServer, tmp_path) -> None:
-    ssh_host = _ssh_host(ssh_server)
+    ssh_host = _ssh_host(ssh_server, workspace_roots=[str(tmp_path)])
     nested = f"{tmp_path}/a/b/c"
     await ssh_host.mkdir(nested)
     entries = await ssh_host.list_dir(f"{tmp_path}/a/b")
     assert any(e.name == "c" and e.is_dir for e in entries)
+
+
+@pytest.mark.asyncio
+async def test_read_file_with_no_workspace_roots_fails_closed(
+    ssh_server: RunningSSHServer, tmp_path
+) -> None:
+    ssh_host = _ssh_host(ssh_server)  # no workspace_roots configured at all
+    with pytest.raises(PermissionDeniedError):
+        await ssh_host.read_file(f"{tmp_path}/anything.txt")
+
+
+@pytest.mark.asyncio
+async def test_read_file_outside_workspace_roots_rejected(
+    ssh_server: RunningSSHServer, tmp_path
+) -> None:
+    ssh_host = _ssh_host(ssh_server, workspace_roots=[f"{tmp_path}/allowed"])
+    with pytest.raises(PermissionDeniedError):
+        await ssh_host.read_file(f"{tmp_path}/other/secret.txt")
+
+
+@pytest.mark.asyncio
+async def test_write_file_traversal_outside_root_rejected(
+    ssh_server: RunningSSHServer, tmp_path
+) -> None:
+    (tmp_path / "allowed").mkdir()
+    ssh_host = _ssh_host(ssh_server, workspace_roots=[str(tmp_path / "allowed")])
+    # Lexically normalizes to a path outside the allowed root before any I/O.
+    traversal_path = f"{tmp_path}/allowed/../escaped.txt"
+    with pytest.raises(PermissionDeniedError):
+        await ssh_host.write_file(traversal_path, b"should never land")
+    assert not (tmp_path / "escaped.txt").exists()
+
+
+@pytest.mark.asyncio
+async def test_read_file_via_symlink_escaping_root_rejected(
+    ssh_server: RunningSSHServer, tmp_path
+) -> None:
+    allowed = tmp_path / "allowed"
+    allowed.mkdir()
+    secret = tmp_path / "secret.txt"
+    secret.write_text("top secret")
+    escape_link = allowed / "escape.txt"
+    escape_link.symlink_to(secret)
+
+    ssh_host = _ssh_host(ssh_server, workspace_roots=[str(allowed)])
+    # Lexically the path is inside `allowed/`, but it resolves (via symlink) outside
+    # it — only the SFTP-realpath-resolved second check catches this.
+    with pytest.raises(PermissionDeniedError):
+        await ssh_host.read_file(str(escape_link))

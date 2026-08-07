@@ -210,7 +210,7 @@ Task format: ID — title / description / deps / components / acceptance / tests
 - Desc: configured workspace roots, canonicalization, traversal rejection, no implicit sudo.
 - Deps: HOST-001. Components: hosts, core.
 - Acceptance: escapes rejected; security tests pass.
-- Tests: unit traversal suite. Status: TODO
+- Tests: unit traversal suite. Status: DONE
 
 ### WSP-001 Workspaces
 - Desc: workspaces table + `/workspaces`, `/workspaces/{id}/tree|file|diff`, `/hosts/{id}/workspaces/browse`, create-folder remotely.

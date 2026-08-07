@@ -49,7 +49,8 @@ names; file paths may evolve. Status: PLANNED / IMPLEMENTED / PASSING.
 | Argv quoted, not shell-concatenated (injection resistance) | `tests/hosts/test_ssh.py::test_exec_stream_quotes_arguments_safely` | PASSING |
 | Workspace browse / mkdir / rw files / git | `tests/api/test_workspaces.py` (WSP-001/002, not yet built) | PLANNED |
 | Works without Node on remote | HOST-001/WSP-* suites never depend on a node component | PASSING (structural — no Node dependency exists anywhere in the SSH path) |
-| Path traversal rejected | `tests/security/test_path_safety.py` (HOST-002, not yet built) | PLANNED |
+| Path traversal rejected (lexical `..`, prefix-sibling, relative, no-roots-fail-closed) | `tests/security/test_path_safety.py` | PASSING |
+| Symlink inside an allowed root resolving outside it is rejected | `tests/hosts/test_ssh.py::test_read_file_via_symlink_escaping_root_rejected`, `tests/security/test_path_safety.py::test_resolve_and_check_rejects_symlink_resolving_outside_root` | PASSING |
 
 ## Node
 | Registers + authenticates (pairing) | `tests/node/test_pairing.py` | PLANNED |
