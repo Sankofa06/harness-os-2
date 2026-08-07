@@ -4,13 +4,14 @@ _Last updated: 2026-08-06_
 
 ## Current milestone
 Milestones 1 (kernel) and 2 (control plane) are fully done. Milestone 3 (language
-compute) is in progress: generic OpenAI-compatible (LP-003), LM Studio (LP-004),
-Ollama (LP-005), and OpenRouter (LP-006) adapters are done; OpenAI/Anthropic/Gemini
-native adapters remain (LP-007).
+compute): every required v1 adapter from SPEC/PROVIDER_MATRIX.md now exists (fake,
+generic OpenAI-compatible, LM Studio, Ollama, OpenRouter, OpenAI, Anthropic, Gemini).
+Remaining in this milestone: LP-008 (model profiles + placement policy) and LP-009
+(instance lifecycle API) — none of these adapters are wired into the app's live
+`ProviderRegistry` or reachable from the API/run loop yet; only the fake provider is.
 
 ## Active task
-None in flight. Next up per `TASKS.md`: LP-007 (OpenAI + Anthropic + Gemini native
-adapters).
+None in flight. Next up per `TASKS.md`: LP-008 (model profiles + placement policy).
 
 ## Completed milestones
 - Phase 1: full spec-kit reading pass (all `SPEC/`, `ADR/`, `BUILD/`, `TESTING/`,
@@ -54,7 +55,7 @@ adapters).
   SPEC/HOSTS_AND_NODE.md, `host_capabilities` table).
 
 ## Known failures
-None functionally. 117/117 backend tests pass, 2/2 web unit tests pass, 1/1 Playwright
+None functionally. 123/123 backend tests pass, 2/2 web unit tests pass, 1/1 Playwright
 e2e test passes. `ruff check`, `ruff format --check`, and `mypy --strict` are clean on
 `src/harness`. `eslint`, `vitest`, and `tsc -b && vite build` are clean on `web/`.
 Cosmetic: some test runs emit a `PytestUnhandledThreadExceptionWarning` from an
@@ -81,9 +82,11 @@ what's built so far:
 - D-014: license selection is deferred to the project owner (placeholder in place).
 
 ## What is NOT yet built
-Native OpenAI/Anthropic/Gemini adapters (LP-007), model profiles/placement policy and the
-instance lifecycle API (LP-008/LP-009) that would let the API actually load/unload
-models through these adapters, SSH hosts/workspaces execution (host *records* exist
+Model profiles/placement policy and the instance lifecycle API (LP-008/LP-009) that
+would let the API actually select/load/unload models through the real adapters
+(they exist and are unit-tested against fixtures, but nothing yet constructs them
+from persisted `ProviderConfig` rows into the live `ProviderRegistry` a session can
+use), SSH hosts/workspaces execution (host *records* exist
 via CP-004, but nothing yet connects to one), tools/permissions engine beyond the
 stub, MCP/skills,
 creative compute, analytics/benchmarks, the Node daemon, the rest of the WebUI
@@ -120,7 +123,7 @@ HARNESS_DEMO_MODE=1 uv run harness serve
 
 Test suites:
 ```bash
-uv run pytest tests -q                      # backend: 117 tests
+uv run pytest tests -q                      # backend: 123 tests
 cd web && npm run test                      # web unit: vitest
 cd web && npx playwright test               # web e2e (needs both servers running)
 ```

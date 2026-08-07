@@ -27,7 +27,10 @@ names; file paths may evolve. Status: PLANNED / IMPLEMENTED / PASSING.
 | LM Studio native discovery/lifecycle/settings | `tests/providers/test_lmstudio.py` vs fixture | PASSING |
 | Ollama adapter | `tests/providers/test_ollama.py` vs fixture | PASSING |
 | OpenRouter adapter (catalog + pricing + authoritative cost) | `tests/providers/test_openrouter.py`, `tests/unit/test_runloop_cost.py` | PASSING |
-| OpenAI/Anthropic/Gemini w/ secret refs | `tests/providers/test_cloud_adapters.py` | PLANNED |
+| OpenAI native adapter | `tests/providers/test_openai_native.py` | PASSING |
+| Anthropic native adapter (system field, max_tokens, SSE event stream) | `tests/providers/test_anthropic.py` | PASSING |
+| Gemini native adapter (role mapping, usageMetadata) | `tests/providers/test_gemini.py` | PASSING |
+| Cloud adapters wired with secret refs (not raw keys) at runtime | — | PLANNED (needs LP-009 instance lifecycle API) |
 | Settings-schema validation (namespaced common/provider.*, passthrough opt-in) | `tests/unit/test_settings_schema.py` | PASSING |
 | Settings schemas render in UI | `web` Playwright `models-settings.spec.ts` | PLANNED |
 | Uniform control-plane descriptor (identity/capabilities/state/settings/health/events) | `tests/unit/test_control_plane.py`, `tests/api/test_system.py::test_capabilities_lists_fake_provider` | PASSING |

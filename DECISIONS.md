@@ -152,3 +152,24 @@ Format: decision / reason / alternatives / consequences.
 - Consequences: any future adapter needing a small per-request payload addition (not
   a full protocol departure) can reuse the same hook instead of re-implementing chat
   streaming.
+
+## D-018 — OpenAI/Anthropic/Gemini native adapters: one thin subclass, two dedicated implementations
+- Decision: `OpenAIProvider` is a thin `OpenAICompatibleProvider` subclass (OpenAI's
+  API *is* the OpenAI-compatible reference shape). `AnthropicProvider` and
+  `GeminiProvider` are dedicated implementations against their real wire protocols —
+  Anthropic's `/v1/messages` (top-level `system` field, required `max_tokens`,
+  multi-event SSE: `message_start`/`content_block_delta`/`message_delta`/
+  `message_stop`) and Gemini's `streamGenerateContent?alt=sse` (`contents` with
+  `role: "user"|"model"` — not `"assistant"`, plus `usageMetadata` per chunk).
+- Reason: forcing Anthropic/Gemini through the OpenAI-compatible code path would mean
+  either a lossy translation layer or silently wrong behavior (e.g. dropping the
+  system prompt, or omitting the `max_tokens` Anthropic requires and getting a 400).
+  ADR 0003 requires adapters to match what a provider actually does.
+- Verification: Gemini's classic `generateContent`/`streamGenerateContent` API was
+  confirmed still fully supported (not fully replaced by the new stateful
+  Interactions API, GA June 2026) and explicitly recommended for stateless calls —
+  which matches Harness's contract, same reasoning as D-015/D-016. Anthropic's shape
+  is Anthropic's own public API and was implemented directly, not guessed.
+- Consequences: all three adapters' fixture tests passed on the first run against the
+  verified shapes, which is corroborating evidence the researched details were
+  accurate rather than just internally self-consistent.

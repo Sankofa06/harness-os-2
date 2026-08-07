@@ -182,7 +182,7 @@ Task format: ID — title / description / deps / components / acceptance / tests
 - Desc: native message/tool semantics per provider, secret references, usage capture.
 - Deps: LP-003, SEC-001. Components: providers.language.
 - Acceptance: DoD Providers bullet 4 against fixtures.
-- Tests: fixture tests per adapter. Status: TODO
+- Tests: fixture tests per adapter. Status: DONE
 
 ### LP-008 Model profiles + placement policy
 - Desc: model_profiles table; policies manual/auto/prefer-loaded/local/fastest/lowest-pressure/lowest-cost; auto opt-in only.
