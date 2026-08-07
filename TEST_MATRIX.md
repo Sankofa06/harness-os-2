@@ -80,7 +80,7 @@ names; file paths may evolve. Status: PLANNED / IMPLEMENTED / PASSING.
 | Tool lifecycle (validate→permission→execute→capture→events); runs recorded in tool_runs | `tests/unit/test_tool_lifecycle.py`, `tests/api/test_tools.py` | PASSING |
 | Add MCP server; compact index; lazy schema; bearer-token auth via secret_ref_id (SEC-001) | `tests/mcp/test_client.py`, `tests/api/test_mcp.py` vs real local fixture server | PASSING |
 | capabilities.search across native tools + MCP index; tools.describe activates a schema; budget stays 0 until activation, then carries into the next compile only | `tests/api/test_capabilities.py` vs real local fixture MCP server + real run loop | PASSING |
-| Skill metadata w/o body load | `tests/skills/test_lazy_skills.py` | PLANNED |
+| Skill metadata w/o body load; activation (REST + skills.activate tool) adds body to next compile only; capabilities.search finds skills | `tests/api/test_skills.py` | PASSING |
 | Superpower toggles | `tests/skills/test_superpowers.py` | PLANNED |
 | Permission ask/allow/deny; ask flow blocks until approval; decisions logged | `tests/api/test_permissions.py` | PASSING |
 | Workspace-scoped file/shell/git tools (TOOL-002) behind permission classes; injection resistance; traversal rejection | `tests/api/test_workspace_tools.py` vs real local SSH server | PASSING |

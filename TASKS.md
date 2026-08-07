@@ -338,7 +338,7 @@ Task format: ID — title / description / deps / components / acceptance / tests
 - Desc: skill package format (metadata/SKILL.md/scripts/activation rules/tool requirements/cost estimate); index cheap, body lazy; `/skills`, `/skills/{id}/activate`.
 - Deps: CTX-002. Components: skills.
 - Acceptance: metadata indexed without body load; activation adds body to compile.
-- Tests: unit + budget tests. Status: TODO
+- Tests: unit + budget tests. Status: DONE
 
 ### SKL-002 Superpower bundles
 - Desc: seed bundles (Coding, Git/GitHub, Browser, Creative, Research, Remote Host, Benchmarking) as capability-exposure toggles; permissions stay explicit.

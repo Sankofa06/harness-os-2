@@ -727,3 +727,37 @@ Format: decision / reason / alternatives / consequences.
   "budget unaffected until activation," not "budget shrinks back down later";
   add a `tools.forget`-style deactivation call if a real workflow needs
   context to shrink back after a capability stops being relevant.
+
+## D-042 — Skills are a separate table pair from the tool/MCP capability index; scripts/reference_docs are declared names only
+- Decision: SKL-001 adds `skills` (metadata + lazy `body`) and
+  `skill_activations` (session_id, skill_id) tables, mirroring MCP-001/
+  MCP-002's compact-index/lazy-body split rather than folding skills into
+  MCP-002's `session_activated_capabilities` table. `POST /skills` accepts
+  the full package (name, description, activation_hints, required_
+  capabilities, scripts, reference_docs, body); `estimated_tokens` is
+  caller-supplied when given, else computed from `body` via the same
+  `HeuristicEstimator` MCP-001/MCP-002 use, since the SPEC/CONTEXT_COMPILER.md
+  "Skill format" YAML example shows `estimated_tokens` as authored metadata,
+  not a mandatory runtime field. `scripts`/`reference_docs` are stored as
+  declared file names only — no content, no execution — since SKL-001's own
+  acceptance criteria ("metadata indexed without body load; activation adds
+  body to compile") requires only that the package *format* have these
+  fields, not that scripts run; nothing in this codebase executes a skill's
+  scripts yet. Activation is exposed two ways sharing one code path
+  (`harness.skills.activation.activate_skill`): `POST /skills/{id}/activate`
+  (SPEC/API_CONTRACT.md's explicit REST resource, for UI-driven activation)
+  and the `skills.activate` native meta-tool (for model-driven activation,
+  alongside `capabilities.search`/`tools.describe`). `capabilities.search`
+  (MCP-002) now also searches skills by name/description/activation_hints,
+  closing the gap D-041 noted ("Skills are not part of this search yet").
+- Reason: SPEC/DATA_MODEL.md calls out `skills`/`skill_activations` as their
+  own entities, distinct from `mcp_servers`/`mcp_tool_index` — keeping them
+  as separate tables (rather than reusing MCP-002's generic capability table)
+  matches that data model and keeps each subsystem's activation semantics
+  independently evolvable (e.g. a future skill-specific field like
+  `required_capabilities` gating doesn't need to shoehorn into the tool/MCP
+  activation row shape).
+- Consequences: a skill's `required_capabilities` are declared metadata only
+  — nothing yet checks that a session's contact actually has those
+  capabilities available before activating; add that check if a real
+  workflow needs it enforced rather than advisory.

@@ -369,6 +369,55 @@ class McpToolIndexEntry(BaseModel):
     trust_class: PermissionClass = "network"
 
 
+class Skill(BaseModel):
+    """A registered skill package (SKL-001, SPEC/CONTEXT_COMPILER.md "Skill
+    format"): methodology/instructions activated lazily. ``body`` (the SKILL.md
+    content) is the expensive part and is never returned by `GET /skills` —
+    only by activation (`POST /skills/{id}/activate` or the `skills.activate`
+    meta-tool) — mirroring MCP-001's compact-index/lazy-schema split for MCP
+    tools. ``scripts``/``reference_docs`` are declared file names only (the
+    package *format* SPEC calls for); nothing executes them yet.
+    """
+
+    id: str
+    name: str
+    description: str = ""
+    activation_hints: list[str] = Field(default_factory=list)
+    estimated_tokens: int = 0
+    required_capabilities: list[str] = Field(default_factory=list)
+    scripts: list[str] = Field(default_factory=list)
+    reference_docs: list[str] = Field(default_factory=list)
+    body: str = ""
+    created_at: str = ""
+
+
+class SkillIndexEntry(BaseModel):
+    """Compact projection of a `Skill` without its body — what `GET /skills`
+    returns (SKL-001's "index cheap, body lazy").
+    """
+
+    id: str
+    name: str
+    description: str = ""
+    activation_hints: list[str] = Field(default_factory=list)
+    estimated_tokens: int = 0
+    required_capabilities: list[str] = Field(default_factory=list)
+
+
+class SkillActivation(BaseModel):
+    """One session's activation of a skill (SPEC/DATA_MODEL.md
+    `skill_activations`) — the skill-specific counterpart to MCP-002's
+    `SessionActivatedCapability`, kept as its own table since SPEC/DATA_MODEL.md
+    calls out `skills`/`skill_activations` as distinct entities from the
+    tool/MCP capability index.
+    """
+
+    id: str
+    session_id: str
+    skill_id: str
+    created_at: str = ""
+
+
 CapabilityKind = Literal["native_tool", "mcp_tool"]
 
 

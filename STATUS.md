@@ -5,9 +5,25 @@ _Last updated: 2026-08-07_
 ## Current milestone
 Milestones 1 (kernel), 2 (control plane), 3 (language compute), 4 (execution),
 and 5 (agent runtime) are all fully done. Milestone 6 (MCP + Skills) is in
-progress: MCP-001 (lazy MCP index) and MCP-002 (capabilities.search +
-activation) are both done — see the notes below. Next up in Milestone 6 is
-SKL-001 (Skills).
+progress: MCP-001 (lazy MCP index), MCP-002 (capabilities.search +
+activation), and SKL-001 (Skills) are all done — see the notes below. Next up
+in Milestone 6 is SKL-002 (Superpower bundles).
+
+SKL-001: `skills` (metadata + lazy `body`) and `skill_activations`
+(session_id, skill_id) tables mirror MCP-001/MCP-002's compact-index/lazy-body
+split. `POST /skills` registers a full package (name, description,
+activation_hints, required_capabilities, scripts, reference_docs, body);
+`GET /skills` never returns the body. Activation is exposed two ways sharing
+one code path (`harness.skills.activation.activate_skill`): `POST /skills/
+{id}/activate` (REST, for UI-driven activation) and the `skills.activate`
+native meta-tool (for model-driven activation). `harness.agents.runloop.
+run_contact` resolves a session's activated skill bodies fresh from `SkillRepo`
+on every compile, same pattern as MCP-002's tool-schema resolution.
+`capabilities.search` now also searches skills by name/description/
+activation_hints, closing the "no skill index yet" gap MCP-002 noted. Proven
+end to end through the real run loop: a session's first turn compiles with
+zero skill-body cost, and only the turn after activation carries it. See
+D-042.
 
 MCP-002: `capabilities.search` (`harness.capabilities.search`) and
 `tools.describe` (`harness.capabilities.activation`) are two new native
@@ -191,8 +207,8 @@ from persisted Runs/ToolRuns on every request rather than a separately
 maintained structure, so it can't drift from what actually happened.
 
 ## Active task
-MCP-001 and MCP-002 are both done (see Current milestone above). Next per
-`TASKS.md` is SKL-001 (Skills).
+MCP-001, MCP-002, and SKL-001 are all done (see Current milestone above).
+Next per `TASKS.md` is SKL-002 (Superpower bundles).
 
 ## Completed milestones
 - Phase 1: full spec-kit reading pass (all `SPEC/`, `ADR/`, `BUILD/`, `TESTING/`,
@@ -250,7 +266,7 @@ asyncio interaction, not an application bug.
 None.
 
 ## Architectural decisions made during implementation
-See `DECISIONS.md` for the full list (D-001 through D-041). Notable ones affecting
+See `DECISIONS.md` for the full list (D-001 through D-042). Notable ones affecting
 what's built so far:
 - D-003/D-004: SQLAlchemy async + plain SQL migrations, schema grows incrementally
   per subsystem milestone rather than all at once.
@@ -265,8 +281,8 @@ what's built so far:
 - D-014: license selection is deferred to the project owner (placeholder in place).
 
 ## What is NOT yet built
-skills (SKL-001/002), creative compute, analytics/benchmarks, the Node
-daemon, the rest of the WebUI (graph/compute/models/creative/assets/
+superpower bundles (SKL-002), creative compute, analytics/benchmarks, the
+Node daemon, the rest of the WebUI (graph/compute/models/creative/assets/
 analytics/approvals views, full three-panel IA, context meter, accessibility
 audit), TUI feature completion, demo mode content, screenshot automation,
 GitHub Pages site, and marketing copy. These are tracked as their own
@@ -300,7 +316,7 @@ HARNESS_DEMO_MODE=1 uv run harness serve
 
 Test suites:
 ```bash
-uv run pytest tests -q                      # backend: 287 tests
+uv run pytest tests -q                      # backend: 298 tests
 cd web && npm run test                      # web unit: vitest
 cd web && npx playwright test               # web e2e (needs both servers running)
 ```

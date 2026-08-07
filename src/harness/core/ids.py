@@ -40,6 +40,7 @@ PREFIXES: frozenset[str] = frozenset(
         "mcpsrv",
         "mcpidx",
         "actcap",
+        "skact",
     }
 )
 

@@ -48,12 +48,14 @@ from harness.persistence.repos_jobs import JobRepo
 from harness.persistence.repos_mcp import McpIndexRepo, McpServerRepo
 from harness.persistence.repos_model_instances import ModelInstanceRepo
 from harness.persistence.repos_permissions import PermissionDecisionRepo, PermissionPolicyRepo
+from harness.persistence.repos_skills import SkillActivationRepo, SkillRepo
 from harness.persistence.repos_tools import ToolRunRepo
 from harness.persistence.repos_workspaces import WorkspaceRepo
 from harness.providers.language.base import LanguageProvider
 from harness.providers.language.factory import build_provider
 from harness.providers.language.fake import FakeProvider
 from harness.providers.language.registry import ProviderRegistry
+from harness.skills.activation import register_skills_activate_tool
 from harness.tools.builtin import echo_tool
 from harness.tools.lifecycle import ToolExecutor
 from harness.tools.permission_engine import PermissionEngine
@@ -101,6 +103,8 @@ class Application:
     mcp_servers: McpServerRepo
     mcp_index: McpIndexRepo
     session_capabilities: SessionCapabilityRepo
+    skills: SkillRepo
+    skill_activations: SkillActivationRepo
     compiler: ContextCompiler
     api_token: str
     system_binding: Binding = field(default_factory=lambda: SYSTEM_DEFAULT_BINDING)
@@ -201,8 +205,11 @@ async def create_application(config: HarnessConfig | None = None) -> Application
     mcp_servers = McpServerRepo(db)
     mcp_index = McpIndexRepo(db)
     session_capabilities = SessionCapabilityRepo(db)
-    register_capabilities_search_tool(tools, mcp_index)
+    skills = SkillRepo(db)
+    skill_activations = SkillActivationRepo(db)
+    register_capabilities_search_tool(tools, mcp_index, skills)
     register_tools_describe_tool(tools, tools, mcp_index, session_capabilities)
+    register_skills_activate_tool(tools, skills, skill_activations)
 
     compiler = ContextCompiler(HeuristicEstimator(), config.context)
 
@@ -241,6 +248,8 @@ async def create_application(config: HarnessConfig | None = None) -> Application
         mcp_servers=mcp_servers,
         mcp_index=mcp_index,
         session_capabilities=session_capabilities,
+        skills=skills,
+        skill_activations=skill_activations,
         compiler=compiler,
         api_token=token,
     )

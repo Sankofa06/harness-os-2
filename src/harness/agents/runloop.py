@@ -24,6 +24,7 @@ from harness.core.domain import Contact, MessageRole, Run, RunMetrics
 from harness.core.ids import new_id
 from harness.events.model import Event, EventResource
 from harness.providers.language.base import ChatMessage, ChatRequest
+from harness.skills.activation import resolve_activated_skill_bodies
 
 
 @dataclass
@@ -178,6 +179,9 @@ async def run_contact(
         active_tool_schemas = await resolve_active_tool_schemas(
             session_id, app.session_capabilities, app.tools, app.mcp_index
         )
+        activated_skills = await resolve_activated_skill_bodies(
+            session_id, app.skill_activations, app.skills
+        )
         compiled = app.compiler.compile(
             contact=contact,
             role=role,
@@ -185,6 +189,7 @@ async def run_contact(
             history=history,
             transcript_state=transcript_state,
             active_tool_schemas=active_tool_schemas,
+            activated_skills=activated_skills,
         )
         await app.publish(
             Event(
