@@ -170,7 +170,7 @@ Task format: ID — title / description / deps / components / acceptance / tests
 - Desc: native API: list/show/pull progress/chat/generate/options/keep-alive/unload; embeddings metadata.
 - Deps: LP-001, CP-003. Components: providers.language.
 - Acceptance: DoD Providers bullet 3 against fixture.
-- Tests: fake Ollama fixture tests. Status: TODO
+- Tests: fake Ollama fixture tests. Status: DONE
 
 ### LP-006 OpenRouter adapter
 - Desc: catalog, pricing/usage/routing metadata, namespaced routing settings.

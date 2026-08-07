@@ -4,11 +4,11 @@ _Last updated: 2026-08-06_
 
 ## Current milestone
 Milestones 1 (kernel) and 2 (control plane) are fully done. Milestone 3 (language
-compute) is in progress: generic OpenAI-compatible (LP-003) and LM Studio native
-(LP-004) adapters are done; Ollama/OpenRouter/OpenAI/Anthropic/Gemini remain.
+compute) is in progress: generic OpenAI-compatible (LP-003), LM Studio (LP-004), and
+Ollama (LP-005) adapters are done; OpenRouter/OpenAI/Anthropic/Gemini remain.
 
 ## Active task
-None in flight. Next up per `TASKS.md`: LP-005 (Ollama adapter).
+None in flight. Next up per `TASKS.md`: LP-006 (OpenRouter adapter).
 
 ## Completed milestones
 - Phase 1: full spec-kit reading pass (all `SPEC/`, `ADR/`, `BUILD/`, `TESTING/`,
@@ -52,7 +52,7 @@ None in flight. Next up per `TASKS.md`: LP-005 (Ollama adapter).
   SPEC/HOSTS_AND_NODE.md, `host_capabilities` table).
 
 ## Known failures
-None functionally. 108/108 backend tests pass, 1/1 web unit test passes, 1/1 Playwright
+None functionally. 114/114 backend tests pass, 2/2 web unit tests pass, 1/1 Playwright
 e2e test passes. `ruff check`, `ruff format --check`, and `mypy --strict` are clean on
 `src/harness`. `eslint`, `vitest`, and `tsc -b && vite build` are clean on `web/`.
 Cosmetic: some test runs emit a `PytestUnhandledThreadExceptionWarning` from an
@@ -79,8 +79,8 @@ what's built so far:
 - D-014: license selection is deferred to the project owner (placeholder in place).
 
 ## What is NOT yet built
-Real cloud/local provider adapters beyond OpenAI-compatible + LM Studio (Ollama,
-OpenRouter, OpenAI, Anthropic, Gemini), model profiles/placement policy and the
+Real cloud provider adapters (OpenRouter, OpenAI, Anthropic, Gemini), model
+profiles/placement policy and the
 instance lifecycle API (LP-008/LP-009) that would let the API actually load/unload
 models through these adapters, SSH hosts/workspaces execution (host *records* exist
 via CP-004, but nothing yet connects to one), tools/permissions engine beyond the
@@ -119,7 +119,7 @@ HARNESS_DEMO_MODE=1 uv run harness serve
 
 Test suites:
 ```bash
-uv run pytest tests -q                      # backend: 108 tests
+uv run pytest tests -q                      # backend: 114 tests
 cd web && npm run test                      # web unit: vitest
 cd web && npx playwright test               # web e2e (needs both servers running)
 ```

@@ -121,3 +121,16 @@ Format: decision / reason / alternatives / consequences.
   advertise."
 - Consequences: if a future LM Studio version changes these field names, only this
   adapter needs updating — the contract (`LanguageProvider`) is unaffected.
+
+## D-016 — Ollama's `model_id` doubles as its `instance_id`; load/unload ride `/api/generate`
+- Decision: `OllamaProvider.load_model`/`unload_model` use `POST /api/generate` with no
+  `prompt` (loads into memory) and `keep_alive: 0` (unloads), respectively — verified
+  against Ollama's public API reference. `ModelInstance.instance_id` is just the model
+  name; Ollama has no multi-instance concept the way LM Studio does.
+- Reason: Ollama has no dedicated load/unload endpoints; the documented mechanism for
+  both is a generate/chat call with specific field combinations. `LanguageProvider`'s
+  `load_model`/`unload_model` contract (added for LM Studio, D-015) is general enough
+  to express this without adapter-specific API changes.
+- Consequences: `common.max_output_tokens` maps to Ollama's `num_predict` option
+  (`_translate_common`); other common fields not present in Ollama's `options` are
+  simply omitted rather than guessed.

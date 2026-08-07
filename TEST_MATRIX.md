@@ -25,7 +25,7 @@ names; file paths may evolve. Status: PLANNED / IMPLEMENTED / PASSING.
 ## Providers
 | Generic OpenAI-compatible works | `tests/providers/test_openai_compat.py` vs fake server | PASSING |
 | LM Studio native discovery/lifecycle/settings | `tests/providers/test_lmstudio.py` vs fixture | PASSING |
-| Ollama adapter | `tests/providers/test_ollama.py` vs fixture | PLANNED |
+| Ollama adapter | `tests/providers/test_ollama.py` vs fixture | PASSING |
 | OpenRouter + OpenAI/Anthropic/Gemini w/ secret refs | `tests/providers/test_cloud_adapters.py` | PLANNED |
 | Settings-schema validation (namespaced common/provider.*, passthrough opt-in) | `tests/unit/test_settings_schema.py` | PASSING |
 | Settings schemas render in UI | `web` Playwright `models-settings.spec.ts` | PLANNED |
