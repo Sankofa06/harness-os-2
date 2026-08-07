@@ -24,6 +24,8 @@ names; file paths may evolve. Status: PLANNED / IMPLEMENTED / PASSING.
 | Regression on eager injection | `tests/context/test_compiler.py::test_no_tools_or_skills_means_zero_cost_sections` | PASSING |
 | Long-session compile keeps protected facts (unresolved reqs/plan/changed files/failing tests/permission decisions) even when history is fully squeezed out | `tests/context/test_transcript_state.py::test_protected_facts_survive_a_budget_too_small_for_any_history` | PASSING |
 | Structured session state + rolling summary persisted per session; run loop compiles it in | `tests/api/test_transcript_state.py` | PASSING |
+| Representative sessions at real production budgets (4K bootstrap/8K normal/16K expanded), run in CI | `tests/context/test_regression_budgets.py` | PASSING |
+| Real ToolRegistry (production tool catalog) contributes zero cost unless explicitly activated | `tests/context/test_regression_budgets.py::test_real_tool_registry_is_not_eagerly_injected` | PASSING |
 
 ## Providers
 | Generic OpenAI-compatible works | `tests/providers/test_openai_compat.py` vs fake server | PASSING |

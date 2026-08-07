@@ -110,10 +110,20 @@ transcript-state` let callers (the run loop, a future tool-result hook) read and
 update it; the run loop now fetches it and passes it into every `compile()` call,
 proven end-to-end via the real `context.compiled` event's budget report.
 
+CTX-004 (Context regression tests) is also done: `tests/context/
+test_regression_budgets.py` compiles realistic session compositions (real
+history exchanges, a role, personas, `TranscriptState`, skill bodies, and — for
+the full-expansion case — schemas pulled from a real `ToolRegistry` with every
+production TOOL-001/002 tool registered) at each tier's *actual* `ContextConfig`
+default (`bootstrap_target_tokens`=4096, `default_budget_tokens`=8192,
+`full_capability_soft_limit_tokens`=16384), not an artificially shrunk budget.
+No separate CI wiring was needed — `.github/workflows/ci.yml`'s existing
+`pytest tests -q` step already covers this directory.
+
 ## Active task
-None in flight. Remaining Milestone 5 work (all now unblocked): CTX-004 (context
-regression tests in CI), AGT-006 (delegation/orchestration graph), AGT-007
-(stop/cancel). Next up per `TASKS.md` order: CTX-004.
+None in flight. Remaining Milestone 5 work (all now unblocked): AGT-006
+(delegation/orchestration graph), AGT-007 (stop/cancel). Next up per `TASKS.md`
+order: AGT-006.
 
 ## Completed milestones
 - Phase 1: full spec-kit reading pass (all `SPEC/`, `ADR/`, `BUILD/`, `TESTING/`,
@@ -157,7 +167,7 @@ regression tests in CI), AGT-006 (delegation/orchestration graph), AGT-007
   SPEC/HOSTS_AND_NODE.md, `host_capabilities` table).
 
 ## Known failures
-None functionally. 246/246 backend tests pass (repeatedly and reliably — see D-030
+None functionally. 250/250 backend tests pass (repeatedly and reliably — see D-030
 for a concurrency race that used to make some flaky before its fix), 2/2 web
 unit tests pass, 1/1 Playwright e2e test passes. `ruff check`, `ruff format --check`,
 and `mypy --strict` are clean on `src/harness`. `eslint`, `vitest`, and `tsc -b &&
@@ -171,7 +181,7 @@ asyncio interaction, not an application bug.
 None.
 
 ## Architectural decisions made during implementation
-See `DECISIONS.md` for the full list (D-001 through D-035). Notable ones affecting
+See `DECISIONS.md` for the full list (D-001 through D-036). Notable ones affecting
 what's built so far:
 - D-003/D-004: SQLAlchemy async + plain SQL migrations, schema grows incrementally
   per subsystem milestone rather than all at once.
@@ -186,8 +196,7 @@ what's built so far:
 - D-014: license selection is deferred to the project owner (placeholder in place).
 
 ## What is NOT yet built
-CTX-004 (context regression CI), AGT-006/007 (delegation/orchestration graph,
-stop/cancel), MCP/skills, creative compute,
+AGT-006/007 (delegation/orchestration graph, stop/cancel), MCP/skills, creative compute,
 analytics/benchmarks, the Node daemon, the rest of the WebUI (graph/compute/models/
 creative/assets/analytics/approvals views, full three-panel IA, context meter,
 accessibility audit), TUI feature completion, demo mode content, screenshot
@@ -221,7 +230,7 @@ HARNESS_DEMO_MODE=1 uv run harness serve
 
 Test suites:
 ```bash
-uv run pytest tests -q                      # backend: 246 tests
+uv run pytest tests -q                      # backend: 250 tests
 cd web && npm run test                      # web unit: vitest
 cd web && npx playwright test               # web e2e (needs both servers running)
 ```

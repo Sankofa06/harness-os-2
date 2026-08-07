@@ -565,3 +565,22 @@ Format: decision / reason / alternatives / consequences.
   for these facts to exist. The compiler and its "always included, never trimmed"
   guarantee are already correct and tested for whenever that wiring lands; this is
   a deliberately incremental scope, not a missed integration.
+
+## D-036 — CTX-004's regression tests need no new CI wiring, only a new test file
+- Decision: CTX-004 ("representative sessions compiled in CI asserting <=4K
+  bootstrap, <=8K normal, <=16K expanded") is satisfied entirely by
+  `tests/context/test_regression_budgets.py` — realistic session compositions
+  (multi-turn history, role, personas, `TranscriptState`, skill bodies, and tool
+  schemas pulled from a real `ToolRegistry` with every production TOOL-001/002
+  tool registered) compiled at each tier's actual `ContextConfig` default rather
+  than a budget shrunk to exercise one code path. `.github/workflows/ci.yml`'s
+  existing `pytest tests -q` step already runs the whole `tests/` tree on every
+  push and PR, so this directory was already "enforced in CI" the moment the file
+  existed — no new workflow step, job, or CI config change was needed.
+- Reason: the acceptance bar is about test *content* (do representative sessions
+  actually fit each budget tier) — CTX-002 already put the test suite inside CI's
+  existing coverage. Adding a redundant, separately-triggered CI job for one test
+  file would only fragment where "does context stay in budget" is answered.
+- Consequences: any future context-budget regression belongs in this same file
+  (or another file under `tests/context/`) — there is no separate "CI context
+  gate" to update elsewhere; the general test job is the gate.

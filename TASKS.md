@@ -292,7 +292,7 @@ Task format: ID — title / description / deps / components / acceptance / tests
 - Desc: representative sessions compiled in CI asserting ≤4K bootstrap, ≤8K normal, ≤16K expanded; fails on eager schema injection.
 - Deps: CTX-002. Components: tests.
 - Acceptance: DoD Context bullets enforced in CI.
-- Tests: this task is tests. Status: TODO
+- Tests: this task is tests. Status: DONE
 
 ### AGT-005 [VS] Run loop
 - Desc: `POST /sessions/{id}/messages` → mention routing → run per target contact → compile → stream inference → events (run.started, run.binding_snapshot, context.compiled, inference.*) → persist messages + run_metrics.
