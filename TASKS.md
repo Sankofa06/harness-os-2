@@ -216,7 +216,7 @@ Task format: ID — title / description / deps / components / acceptance / tests
 - Desc: workspaces table + `/workspaces`, `/workspaces/{id}/tree|file|diff`, `/hosts/{id}/workspaces/browse`, create-folder remotely.
 - Deps: HOST-002. Components: workspaces, api.
 - Acceptance: phone workflow steps 3–7 (backend part) work.
-- Tests: API integration vs SSH fixture. Status: TODO
+- Tests: API integration vs SSH fixture. Status: DONE
 
 ### WSP-002 Git operations
 - Desc: `/workspaces/{id}/git/*`: init/status/diff/add/commit/branch/log via structured exec.

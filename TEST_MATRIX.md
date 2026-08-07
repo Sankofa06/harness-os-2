@@ -47,7 +47,9 @@ names; file paths may evolve. Status: PLANNED / IMPLEMENTED / PASSING.
 | SSH exec streams stdout/stderr, reports exit status, cancelable | `tests/hosts/test_ssh.py` vs real local SSH server | PASSING |
 | SFTP read/write/list/move/delete/mkdir | `tests/hosts/test_ssh.py` | PASSING |
 | Argv quoted, not shell-concatenated (injection resistance) | `tests/hosts/test_ssh.py::test_exec_stream_quotes_arguments_safely` | PASSING |
-| Workspace browse / mkdir / rw files / git | `tests/api/test_workspaces.py` (WSP-001/002, not yet built) | PLANNED |
+| Workspace browse / mkdir / rw files / diff | `tests/api/test_workspaces.py` (WSP-001) | PASSING |
+| Workspace-level containment narrower than Host's own workspace_roots | `tests/api/test_workspaces.py::test_workspace_file_path_cannot_escape_workspace_root` | PASSING |
+| Git init/status/add/commit/branch/log via structured exec | `tests/api/test_workspaces.py` (WSP-002, not yet built — diff alone is covered by WSP-001) | PLANNED |
 | Works without Node on remote | HOST-001/WSP-* suites never depend on a node component | PASSING (structural — no Node dependency exists anywhere in the SSH path) |
 | Path traversal rejected (lexical `..`, prefix-sibling, relative, no-roots-fail-closed) | `tests/security/test_path_safety.py` | PASSING |
 | Symlink inside an allowed root resolving outside it is rejected | `tests/hosts/test_ssh.py::test_read_file_via_symlink_escaping_root_rejected`, `tests/security/test_path_safety.py::test_resolve_and_check_rejects_symlink_resolving_outside_root` | PASSING |

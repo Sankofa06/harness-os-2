@@ -38,6 +38,7 @@ from harness.persistence.repos import (
 from harness.persistence.repos_control_plane import HostRepo, ModelProfileRepo, ProviderConfigRepo
 from harness.persistence.repos_jobs import JobRepo
 from harness.persistence.repos_model_instances import ModelInstanceRepo
+from harness.persistence.repos_workspaces import WorkspaceRepo
 from harness.providers.language.base import LanguageProvider
 from harness.providers.language.factory import build_provider
 from harness.providers.language.fake import FakeProvider
@@ -67,6 +68,7 @@ class Application:
     job_manager: JobManager
     provider_configs: ProviderConfigRepo
     hosts: HostRepo
+    workspaces: WorkspaceRepo
     model_profiles: ModelProfileRepo
     model_instances: ModelInstanceRepo
     providers: ProviderRegistry
@@ -144,6 +146,7 @@ async def create_application(config: HarnessConfig | None = None) -> Application
     job_manager = JobManager(repo=jobs, bus=bus)
     provider_configs = ProviderConfigRepo(db)
     hosts = HostRepo(db)
+    workspaces = WorkspaceRepo(db)
     model_profiles = ModelProfileRepo(db)
     model_instances = ModelInstanceRepo(db)
 
@@ -172,6 +175,7 @@ async def create_application(config: HarnessConfig | None = None) -> Application
         job_manager=job_manager,
         provider_configs=provider_configs,
         hosts=hosts,
+        workspaces=workspaces,
         model_profiles=model_profiles,
         model_instances=model_instances,
         providers=providers,

@@ -13,7 +13,7 @@ async def test_migrate_creates_schema_and_is_idempotent() -> None:
     assert numbers == sorted(numbers)
     assert numbers == list(range(1, len(numbers) + 1))
 
-    for table in ("contacts", "providers", "hosts", "host_capabilities"):
+    for table in ("contacts", "providers", "hosts", "host_capabilities", "workspaces"):
         tables = await db.fetch_all(
             "SELECT name FROM sqlite_master WHERE type = 'table' AND name = :t", {"t": table}
         )

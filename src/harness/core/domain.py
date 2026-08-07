@@ -48,6 +48,20 @@ class Host(BaseModel):
     capabilities: list[str] = Field(default_factory=list)
 
 
+class Workspace(BaseModel):
+    """A folder on a Host that filesystem/shell operations are scoped to
+    (SPEC/WORKSPACES_ARTIFACTS.md). ``root_path`` must fall within its Host's
+    ``workspace_roots`` (checked at creation time and re-checked on every
+    path-taking operation via HOST-002's containment layer).
+    """
+
+    id: str
+    host_id: str
+    root_path: str
+    display_name: str
+    created_at: str = ""
+
+
 LoadPolicy = Literal["manual", "always_loaded", "on_demand"]
 PlacementPolicy = Literal[
     "manual",

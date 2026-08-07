@@ -294,3 +294,41 @@ Format: decision / reason / alternatives / consequences.
   TOOL-002/PERM-001 land). Every `Host` used for real file I/O must have at least
   one `workspace_roots` entry configured, or every SFTP call on it raises
   `PermissionDeniedError` immediately.
+
+## D-025 — Workspace containment is narrower than, and additional to, Host containment
+- Decision: a `Workspace` (WSP-001) pins one `root_path` on one `Host`. Every
+  `/workspaces/{id}/*` endpoint that takes a caller-supplied relative path resolves
+  it onto `root_path` and re-checks containment against `root_path` alone (via
+  `harness.hosts.path_safety.canonicalize_and_check`) *before* calling into
+  `SSHHost`, which then independently re-checks containment against the *Host's*
+  (broader) `workspace_roots`. `POST /workspaces` itself is rejected up front if the
+  requested `root_path` doesn't fall under the target Host's configured roots.
+- Reason: a Host's `workspace_roots` is deliberately host-wide (e.g. `/home/user/
+  projects`), but a single Workspace is scoped to one folder inside it (e.g. `/home/
+  user/projects/proj-a`). Without a second, narrower check, a relative path like
+  `../proj-b/secret.txt` sent to Workspace A's `/file` endpoint would still pass the
+  Host-level check (proj-b is under the same host root) and leak into a sibling
+  Workspace's files — proven by `test_workspace_file_path_cannot_escape_workspace_
+  root` (tests/api/test_workspaces.py), which creates two sibling project folders
+  under one Host root and confirms Workspace A cannot read Workspace B's file.
+- Consequences: two independent containment checks now run on every Workspace file
+  operation (workspace-root lexical check in the route handler, Host-root
+  lexical+SFTP-resolved check inside `SSHHost`) — deliberate defense in depth rather
+  than redundancy to remove, since they enforce different (nested) boundaries owned
+  by different layers.
+
+## D-026 — Workspace `diff` ships with WSP-001; the rest of git waits for WSP-002
+- Decision: `GET /workspaces/{id}/diff` runs `git rev-parse --is-inside-work-tree`
+  to detect a repo, then a real `git diff` (optionally scoped to one path) via
+  `SSHHost.exec_stream`, returning `{"is_git_repo": false, "diff": ""}` rather than
+  an error when the folder isn't a Git repo yet. `git init`/status/add/commit/
+  branch/log are left for WSP-002.
+- Reason: SPEC/WORKSPACES_ARTIFACTS.md's phone-workflow requirement ("see file tree
+  and diffs") needs *some* diff view to be usable at all before a session can show
+  an agent's edits, and TASKS.md's own WSP-001 acceptance line lists `diff` in its
+  endpoint set alongside `tree`/`file`. Read-only `git diff` doesn't need the
+  broader structured multi-subcommand plumbing (init/add/commit/branch/log) that
+  WSP-002 is scoped to build; scoping it out of WSP-001 would leave phone-workflow
+  step "see diffs" unimplementable until a later milestone for no real benefit.
+- Consequences: WSP-002 reuses this same `exec_stream`-based pattern for its own
+  git subcommands rather than introducing a second git-invocation helper.

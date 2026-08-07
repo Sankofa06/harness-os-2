@@ -24,6 +24,7 @@ from harness.api.routes import (
     secrets,
     sessions,
     system,
+    workspaces,
 )
 from harness.core.app import Application, create_application
 from harness.core.config import HarnessConfig, SecurityConfig
@@ -90,5 +91,6 @@ def create_app(
     app.include_router(hosts.router, prefix=API_PREFIX)
     app.include_router(model_profiles.router, prefix=API_PREFIX)
     app.include_router(instances.router, prefix=API_PREFIX)
+    app.include_router(workspaces.router, prefix=API_PREFIX)
 
     return app
