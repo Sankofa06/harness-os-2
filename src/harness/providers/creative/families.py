@@ -30,14 +30,15 @@ recognize their installation by.
 CRE-002 adds the per-engine capability model SPEC's "Platform behavior"
 section calls for (``acceleration_backends``/``api_strategy``/
 ``launch_strategy``/``asset_types``/``capability_set``), plus ``implemented``
-— every family is ``implemented=False`` right now, because CRE-002 is the
-*declarative* capability model only; no live adapter exists yet for any
-engine (that's CRE-003 onward, one engine at a time). ``capability_set``
-describes what SPEC documents the underlying tool as *capable of*, not what
-Harness can currently *do* — keeping the two separate is exactly what "no
-fake controls" (CRE-002's acceptance criterion) means: a caller must be able
-to tell the difference between "this engine supports X" and "Harness can
-exercise X right now."
+— every family defaults to ``implemented=False`` because CRE-002 is the
+*declarative* capability model only; a family only flips to ``True`` once
+CRE-003-onward actually builds a live adapter for it, one engine at a time
+(ComfyUI, via `harness.providers.creative.comfyui`, is the first).
+``capability_set`` describes what SPEC documents the underlying tool as
+*capable of*, not what Harness can currently *do* — keeping the two separate
+is exactly what "no fake controls" (CRE-002's acceptance criterion) means: a
+caller must be able to tell the difference between "this engine supports X"
+and "Harness can exercise X right now."
 """
 
 from __future__ import annotations
@@ -295,6 +296,9 @@ FAMILIES: tuple[CreativePackageFamily, ...] = (
         api_strategy="http_adapter",
         asset_types=_NODE_WORKFLOW_ASSET_TYPES,
         capability_set=_COMFYUI_CAPABILITIES,
+        # CRE-003 added a real live adapter (harness.providers.creative.comfyui) —
+        # the only family this is true for so far.
+        implemented=True,
     ),
     CreativePackageFamily(
         id="stableswarmui",

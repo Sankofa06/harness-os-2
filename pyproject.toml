@@ -36,6 +36,7 @@ dev = [
     "types-pyyaml",
     "cryptography>=43.0",
     "types-jsonschema",
+    "python-multipart>=0.0.12",
 ]
 
 [build-system]

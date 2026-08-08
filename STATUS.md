@@ -5,9 +5,9 @@ _Last updated: 2026-08-07_
 ## Current milestone
 Milestones 1-6 are all fully done (kernel, control plane, language compute,
 execution, agent runtime, MCP + Skills). Milestone 7 (Creative compute) is in
-progress: CRE-001 (Stability Matrix discovery) and CRE-002 (Engine
-capability model) are both done — see the notes below. Next up is CRE-003
-(ComfyUI deep adapter).
+progress: CRE-001 (Stability Matrix discovery), CRE-002 (Engine capability
+model), and CRE-003 (ComfyUI deep adapter) are all done — see the notes
+below. Next up is CRE-004 (A1111/Forge compatible adapter).
 
 CRE-001: `harness.providers.creative.families`/`discovery` parses Stability
 Matrix's `<DataDir>/settings.json` (verified via source inspection — its
@@ -39,6 +39,27 @@ model only; no live engine adapter exists until CRE-003 lands. `GET
 exposing only the genuinely real `extra_launch_args` field) serve this
 catalog directly — no database table needed, same as `SKL-002`'s superpower
 bundles. See D-045.
+
+CRE-003: `harness.providers.creative.comfyui` is ComfyUI's first live
+`api_strategy="http_adapter"` implementation — `comfyui.client.ComfyUIClient`
+hand-rolls the verified real endpoint set (health, object/node metadata,
+submit, queue, interrupt, history, image upload/download, WS progress) and
+`comfyui.adapter.run_comfyui_generation` orchestrates one generation as a
+Job (JOB-001): store the workflow as an Artifact *before* submitting
+(SPEC: never inline workflow JSON into context), submit, stream WS progress
+into Harness events + job progress, capture each output image as its own
+Artifact. `POST /creative/workflows`/`GET /creative/workflows` and
+`POST /creative/jobs`/`GET /creative/jobs` expose this; `engine_id` is a
+`Literal["comfyui"]` so no engine without a real adapter can be requested.
+`comfyui`'s `implemented` flag in the CRE-002 catalog is now `true` — the
+only family this is true for. Testing against a real local fixture ComfyUI
+server (uvicorn + real WebSocket, not mocks) caught a genuine ordering bug
+before it shipped: the client must open its WebSocket and confirm
+registration *before* submitting, since ComfyUI starts executing (and
+pushing progress with no replay) the instant `/prompt` returns — connecting
+after submission silently dropped every early event in a real run. See
+D-046 (also covers the same ordering-tiebreaker fix as D-043, applied to
+`ArtifactRepo`/`JobRepo`).
 
 SKL-002: `harness.skills.superpowers.BUNDLES` declares the seven seed
 bundles (Coding, Git/GitHub, Browser, Creative, Research, Remote Host,
@@ -256,8 +277,8 @@ from persisted Runs/ToolRuns on every request rather than a separately
 maintained structure, so it can't drift from what actually happened.
 
 ## Active task
-CRE-001 and CRE-002 are both done (see Current milestone above). Next per
-`TASKS.md` is CRE-003 (ComfyUI deep adapter).
+CRE-001, CRE-002, and CRE-003 are all done (see Current milestone above).
+Next per `TASKS.md` is CRE-004 (A1111/Forge compatible adapter).
 
 ## Completed milestones
 - Phase 1: full spec-kit reading pass (all `SPEC/`, `ADR/`, `BUILD/`, `TESTING/`,
@@ -315,7 +336,7 @@ asyncio interaction, not an application bug.
 None.
 
 ## Architectural decisions made during implementation
-See `DECISIONS.md` for the full list (D-001 through D-045). Notable ones affecting
+See `DECISIONS.md` for the full list (D-001 through D-046). Notable ones affecting
 what's built so far:
 - D-003/D-004: SQLAlchemy async + plain SQL migrations, schema grows incrementally
   per subsystem milestone rather than all at once.
@@ -330,8 +351,8 @@ what's built so far:
 - D-014: license selection is deferred to the project owner (placeholder in place).
 
 ## What is NOT yet built
-the rest of creative compute (live engine adapters — ComfyUI, A1111/Forge,
-etc. — asset catalog, profiles, batch comparison, provenance),
+the rest of creative compute (A1111/Forge-compatible adapter and remaining
+engine families, asset catalog, profiles, batch comparison, provenance),
 analytics/benchmarks, the Node daemon, the rest of the WebUI (graph/compute/
 models/creative/assets/analytics/approvals views, full three-panel IA,
 context meter, accessibility audit), TUI feature completion, demo mode
@@ -366,7 +387,7 @@ HARNESS_DEMO_MODE=1 uv run harness serve
 
 Test suites:
 ```bash
-uv run pytest tests -q                      # backend: 335 tests
+uv run pytest tests -q                      # backend: 354 tests
 cd web && npm run test                      # web unit: vitest
 cd web && npx playwright test               # web e2e (needs both servers running)
 ```

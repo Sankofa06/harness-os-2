@@ -27,12 +27,13 @@ def test_every_family_declares_a_full_capability_model() -> None:
         assert family.capability_set, family.id
 
 
-def test_no_fake_controls_nothing_is_implemented_yet() -> None:
-    """CRE-002's acceptance bar: this milestone only builds the declarative
-    model. Any family claiming `implemented=True` here would be a fake
-    control, since no live adapter (CRE-003+) exists yet.
+def test_no_fake_controls_only_families_with_a_real_adapter_are_implemented() -> None:
+    """CRE-002's acceptance bar: `implemented` must track whether a live
+    adapter actually exists, not what's merely declared possible. As of
+    CRE-003, ComfyUI is the only family with one.
     """
-    assert all(not family.implemented for family in FAMILIES)
+    implemented_ids = {f.id for f in FAMILIES if f.implemented}
+    assert implemented_ids == {"comfyui"}
 
 
 def test_comfyui_is_http_adapter_tier_with_deep_capabilities() -> None:

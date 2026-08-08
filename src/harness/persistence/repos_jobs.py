@@ -35,8 +35,16 @@ class JobRepo:
             raise NotFoundError(f"job not found: {job_id}")
         return _job(row)
 
-    async def list(self) -> list[Job]:
-        rows = await self._db.fetch_all("SELECT * FROM jobs ORDER BY created_at DESC")
+    async def list(self, *, job_type: str | None = None) -> list[Job]:
+        if job_type is not None:
+            rows = await self._db.fetch_all(
+                "SELECT * FROM jobs WHERE type = :type ORDER BY created_at DESC, rowid DESC",
+                {"type": job_type},
+            )
+        else:
+            rows = await self._db.fetch_all(
+                "SELECT * FROM jobs ORDER BY created_at DESC, rowid DESC"
+            )
         return [_job(r) for r in rows]
 
     async def set_status(self, job_id: str, status: JobStatus, *, error: str | None = None) -> None:

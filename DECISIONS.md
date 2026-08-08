@@ -877,3 +877,49 @@ Format: decision / reason / alternatives / consequences.
   `GET /creative/engines*` needs no database table: the catalog is pure
   declarative data, identical to how `harness.skills.superpowers.BUNDLES`
   needs none either.
+
+## D-046 — ComfyUI adapter: WebSocket must connect before submission; workflow/output via Artifacts; result lives only in the job.completed event
+- Decision: `harness.providers.creative.comfyui.client.ComfyUIClient` is a
+  hand-rolled httpx+`websockets` client against ComfyUI's real server API
+  (verified via source inspection of `server.py`/`execution.py` — no
+  published spec exists): `/system_stats`, `/object_info[/{class}]`,
+  `/prompt` (submit), `/queue`, `/prompt` (GET, queue depth), `/interrupt`,
+  `/history[/{id}]`, `/upload/image`, `/view`, and `/ws?clientId=`. A real
+  ordering bug was caught by testing against a real fixture server rather
+  than mocks: ComfyUI starts executing (and pushing WS progress) the instant
+  `POST /prompt` returns, with no event replay for a late subscriber, so the
+  client's `ws_connect`/`iter_ws_events` are split into two calls specifically
+  so `harness.providers.creative.comfyui.adapter.run_comfyui_generation` can
+  open the WebSocket, consume its initial `status` handshake frame (proving
+  the connection is registered server-side), and only *then* call
+  `submit_prompt` — connecting after submission (the first draft) silently
+  dropped every early progress message in a real end-to-end run. The
+  workflow graph is stored as an Artifact (type `workflow`, new — required a
+  migration rebuilding `artifacts`' CHECK constraint, SQLite having no ALTER
+  for those) *before* submission and referenced by id from then on
+  (SPEC: workflow JSON "MUST NOT be injected into LLM context by default");
+  each captured output image becomes its own Artifact the same way.
+  Generation runs as a Job (JOB-001); `Job` itself carries no result field,
+  so the summary (`prompt_id`/`workflow_artifact_id`/`output_artifact_ids`)
+  lives only in that job's `job.completed` event payload — matching how
+  every other Job-driven flow in this codebase already reports results.
+  `POST /creative/jobs` accepts only `engine_id="comfyui"` (a `Literal`, so
+  FastAPI itself 422s anything else) since no other engine has a real
+  adapter — accepting one would be exactly the "fake control" D-045 already
+  ruled out. `_store_and_record`, previously private to `api.routes.
+  artifacts`, was extracted to `harness.artifacts.service.
+  store_and_record_artifact` since CRE-003 is a second real caller.
+- Reason: "verify, don't guess" for ComfyUI's actual protocol behavior is
+  what caught the connect-ordering bug before it shipped — a plausible-
+  looking client built from memory/documentation summaries would very
+  plausibly have gotten this exact detail wrong, and it would have silently
+  dropped progress in production rather than failing a test.
+- Consequences: also fixed in this pass — `ArtifactRepo.list()` and
+  `JobRepo.list()` had the same same-second-timestamp ordering gap already
+  found and fixed in `ToolRunRepo.list()` (D-043); both now sort
+  `created_at DESC, rowid DESC`. `JobRepo.list()` gained an optional
+  `job_type` filter (mirroring `ToolRunRepo.list(tool_name=...)`) to back
+  `GET /creative/jobs`. ComfyUI's `interrupt`/`upload_image` are exposed on
+  `ComfyUIClient` directly but not wired into the generation flow or any
+  REST route yet — a caller using the client library has them; nothing in
+  the API surface calls them today.

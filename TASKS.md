@@ -366,7 +366,7 @@ Task format: ID — title / description / deps / components / acceptance / tests
 - Desc: health, object/node metadata, queue, workflow submit, progress events, interrupt, history, image upload, workflow JSON stored by reference (never in LLM context by default), output artifact capture, asset discovery.
 - Deps: CRE-002, ART-001, JOB-001. Components: providers.creative.
 - Acceptance: DoD "ComfyUI deep adapter can submit workflow and capture output" vs fake ComfyUI server.
-- Tests: fixture integration tests. Status: TODO
+- Tests: fixture integration tests. Status: DONE (asset cataloging from `object_info`'s discoverable checkpoint/LoRA/etc. enums is deferred to CRE-005 "Creative assets catalog" — `object_info`/`object_info_for` are implemented and real, but nothing parses them into an asset inventory yet)
 
 ### CRE-004 A1111/Forge-compatible adapter
 - Desc: txt2img/img2img/options/samplers/models/VAEs/LoRAs/progress/interrupt/extras where exposed; capability-negotiated.

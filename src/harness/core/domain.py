@@ -308,6 +308,7 @@ ArtifactType = Literal[
     "plan",
     "benchmark_report",
     "arbitrary_file",
+    "workflow",
 ]
 
 

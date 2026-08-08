@@ -1,5 +1,6 @@
-"""Stability Matrix installation discovery + engine capability model
-endpoints (CRE-001/CRE-002, SPEC/CREATIVE_COMPUTE.md, SPEC/API_CONTRACT.md).
+"""Stability Matrix installation discovery + engine capability model +
+ComfyUI generation endpoints (CRE-001/CRE-002/CRE-003,
+SPEC/CREATIVE_COMPUTE.md, SPEC/API_CONTRACT.md).
 
 Discovery reads `<data_dir>/settings.json` from a registered SSH Host via
 the same `SSHHost.read_file`/workspace-root containment HOST-002 already
@@ -8,25 +9,34 @@ established (`data_dir` must fall under that host's configured
 is SSH-only today; that's a real, declared limitation, not a placeholder.
 
 The `/creative/engines*` routes serve `harness.providers.creative.families`'s
-declarative catalog directly — there is no live engine communication here
-(that starts with CRE-003's ComfyUI adapter), so every engine's
-`implemented` field is `false`: the capability model describes what SPEC
-documents an engine as *capable of*, never what Harness can currently do.
+declarative catalog directly — every engine's `implemented` field reflects
+whether a live adapter actually exists (only ComfyUI's does, as of CRE-003).
+
+`/creative/workflows` stores a workflow graph as an Artifact (ART-001) —
+referenced by id, never inlined into any LLM-facing context.
+`POST /creative/jobs` runs one generation as a Job (JOB-001); only
+`engine_id="comfyui"` is accepted, since that's the only engine with a real
+adapter — accepting any other id here would itself be a fake control.
 """
 
 from __future__ import annotations
 
+import json
 from typing import Any, Literal, cast
 
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel
 
 from harness.api.auth import require_auth
+from harness.artifacts.service import store_and_record_artifact
 from harness.core.app import Application
-from harness.core.domain import CreativeInstallation
-from harness.core.errors import NotFoundError
+from harness.core.domain import Artifact, CreativeInstallation
+from harness.core.errors import NotFoundError, ValidationFailedError
 from harness.core.settings_schema import SettingsSchema
 from harness.hosts.resolve import build_ssh_host
+from harness.jobs.manager import JobHandle
+from harness.jobs.model import Job
+from harness.providers.creative.comfyui.adapter import run_comfyui_generation
 from harness.providers.creative.discovery import parse_installed_packages
 from harness.providers.creative.families import FAMILIES, FAMILIES_BY_ID
 
@@ -145,3 +155,74 @@ async def get_engine_settings_schema(request: Request, engine_id: str) -> dict[s
         }
     )
     return schema.to_dict()
+
+
+class WorkflowCreate(BaseModel):
+    engine_id: str
+    display_name: str
+    graph: dict[str, Any]
+    session_id: str | None = None
+    workspace_id: str | None = None
+
+
+@router.post("/creative/workflows", status_code=201)
+async def create_workflow(request: Request, body: WorkflowCreate) -> Artifact:
+    if body.engine_id not in FAMILIES_BY_ID:
+        raise ValidationFailedError(f"unknown engine id: {body.engine_id}")
+    return await store_and_record_artifact(
+        _app(request),
+        type="workflow",
+        display_name=body.display_name,
+        content=json.dumps(body.graph).encode("utf-8"),
+        mime_type="application/json",
+        session_id=body.session_id,
+        workspace_id=body.workspace_id,
+        metadata={"engine_id": body.engine_id},
+    )
+
+
+@router.get("/creative/workflows")
+async def list_workflows(request: Request) -> list[Artifact]:
+    return await _app(request).artifacts.list(artifact_type="workflow")
+
+
+class CreativeJobRequest(BaseModel):
+    engine_id: Literal["comfyui"]
+    base_url: str
+    workflow: dict[str, Any] | None = None
+    workflow_artifact_id: str | None = None
+    session_id: str | None = None
+    workspace_id: str | None = None
+
+
+@router.post("/creative/jobs", status_code=202)
+async def submit_creative_job(request: Request, body: CreativeJobRequest) -> Job:
+    """Only `engine_id="comfyui"` is accepted — the `Literal` type itself
+    enforces that (FastAPI 422s any other value), so this endpoint can never
+    accept a request for an engine with no real adapter.
+    """
+    app = _app(request)
+    if body.workflow is not None:
+        graph = body.workflow
+    elif body.workflow_artifact_id is not None:
+        artifact = await app.artifacts.get(body.workflow_artifact_id)  # 404s if unknown
+        graph = json.loads(app.artifact_blobs.get(artifact.sha256))
+    else:
+        raise ValidationFailedError("either workflow or workflow_artifact_id is required")
+
+    async def work(handle: JobHandle) -> dict[str, Any]:
+        return await run_comfyui_generation(
+            app,
+            handle,
+            base_url=body.base_url,
+            workflow=graph,
+            session_id=body.session_id,
+            workspace_id=body.workspace_id,
+        )
+
+    return await app.job_manager.submit("creative.comfyui.generate", work)
+
+
+@router.get("/creative/jobs")
+async def list_creative_jobs(request: Request) -> list[Job]:
+    return await _app(request).jobs.list(job_type="creative.comfyui.generate")

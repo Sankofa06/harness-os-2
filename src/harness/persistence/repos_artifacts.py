@@ -68,7 +68,7 @@ class ArtifactRepo:
             params["type"] = artifact_type
         where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
         rows = await self._db.fetch_all(
-            f"SELECT * FROM artifacts{where} ORDER BY created_at DESC", params
+            f"SELECT * FROM artifacts{where} ORDER BY created_at DESC, rowid DESC", params
         )
         return [_artifact(r) for r in rows]
 

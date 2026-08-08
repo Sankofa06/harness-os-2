@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import base64
 import binascii
-import mimetypes
 from typing import Any, cast
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -27,10 +26,10 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from harness.api.auth import require_auth
+from harness.artifacts.service import store_and_record_artifact
 from harness.core.app import Application
 from harness.core.domain import Artifact, ArtifactType
 from harness.core.errors import ValidationFailedError
-from harness.core.ids import new_id
 from harness.events.model import Event, EventResource
 from harness.workspaces.service import resolve_within_workspace, ssh_host_for_workspace
 
@@ -51,51 +50,13 @@ class ArtifactCreate(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
-async def _store_and_record(
-    app: Application,
-    *,
-    type: ArtifactType,
-    display_name: str,
-    content: bytes,
-    mime_type: str | None,
-    run_id: str | None,
-    session_id: str | None,
-    workspace_id: str | None,
-    source_path: str | None,
-    metadata: dict[str, Any],
-) -> Artifact:
-    sha256, size = app.artifact_blobs.put(content)
-    artifact = Artifact(
-        id=new_id("art"),
-        type=type,
-        mime_type=mime_type or mimetypes.guess_type(display_name)[0] or "application/octet-stream",
-        display_name=display_name,
-        size=size,
-        sha256=sha256,
-        run_id=run_id,
-        session_id=session_id,
-        workspace_id=workspace_id,
-        source_path=source_path,
-        metadata=metadata,
-    )
-    created = await app.artifacts.create(artifact)
-    await app.publish(
-        Event(
-            type="artifact.created",
-            resource=EventResource(type="artifact", id=created.id),
-            payload={"sha256": sha256, "size": size, "type": type},
-        )
-    )
-    return created
-
-
 @router.post("/artifacts", status_code=201)
 async def create_artifact(request: Request, body: ArtifactCreate) -> Artifact:
     try:
         content = base64.b64decode(body.content_base64, validate=True)
     except binascii.Error as exc:
         raise ValidationFailedError(f"content_base64 is not valid base64: {exc}") from exc
-    return await _store_and_record(
+    return await store_and_record_artifact(
         _app(request),
         type=body.type,
         display_name=body.display_name,
@@ -103,8 +64,6 @@ async def create_artifact(request: Request, body: ArtifactCreate) -> Artifact:
         mime_type=body.mime_type,
         run_id=body.run_id,
         session_id=body.session_id,
-        workspace_id=None,
-        source_path=None,
         metadata=body.metadata,
     )
 
@@ -161,7 +120,7 @@ async def pull_artifact(request: Request, workspace_id: str, body: ArtifactPullR
     absolute = resolve_within_workspace(workspace, body.path)
     ssh_host = await ssh_host_for_workspace(workspace, app.hosts, app.secret_refs, app.secret_store)
     content = await ssh_host.read_file(absolute)
-    return await _store_and_record(
+    return await store_and_record_artifact(
         app,
         type=body.type,
         display_name=body.display_name or body.path.rsplit("/", 1)[-1],

@@ -13,11 +13,11 @@ async def test_list_engines_returns_all_families(client) -> None:
     assert resp.status_code == 200
     engines = resp.json()
     assert len(engines) == 22
-    assert all(e["implemented"] is False for e in engines)
-    ids = {e["id"] for e in engines}
-    assert "comfyui" in ids
-    assert "automatic1111" in ids
-    assert "invokeai" in ids
+    by_id = {e["id"]: e for e in engines}
+    # Only ComfyUI has a real adapter (CRE-003) — everyone else stays honest.
+    assert by_id["comfyui"]["implemented"] is True
+    assert by_id["automatic1111"]["implemented"] is False
+    assert by_id["invokeai"]["implemented"] is False
 
 
 @pytest.mark.asyncio
