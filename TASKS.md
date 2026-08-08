@@ -360,7 +360,7 @@ Task format: ID — title / description / deps / components / acceptance / tests
 - Desc: per-engine supported_platforms/acceleration_backends/api_strategy/launch_strategy/asset_types/capability_set; integration hierarchy (native API → compat layer → HTTP adapter → launch/fs → read-only).
 - Deps: CRE-001, CP-002. Components: providers.creative.
 - Acceptance: engines show real capability level; no fake controls.
-- Tests: unit capability mapping tests. Status: TODO
+- Tests: unit capability mapping tests. Status: DONE
 
 ### CRE-003 ComfyUI deep adapter
 - Desc: health, object/node metadata, queue, workflow submit, progress events, interrupt, history, image upload, workflow JSON stored by reference (never in LLM context by default), output artifact capture, asset discovery.

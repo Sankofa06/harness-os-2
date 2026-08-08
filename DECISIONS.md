@@ -804,7 +804,7 @@ Format: decision / reason / alternatives / consequences.
   reads Stability Matrix's `<DataDir>/settings.json` (its *only* per-install
   metadata — there is no per-package folder file, confirmed by inspecting
   the LykosAI/StabilityMatrix source, since no official schema doc exists).
-  Because only 5 of the 20 SPEC-required package families' exact
+  Because only 5 of the 22 SPEC-required package families' exact
   `PackageName` strings were independently verified (`ComfyUI`,
   `stable-diffusion-webui`, `stable-diffusion-webui-forge`, `Fooocus`,
   `InvokeAI`), the family catalog (`FAMILIES`) matches by case-insensitive
@@ -822,7 +822,7 @@ Format: decision / reason / alternatives / consequences.
   already established — there is no local/"node"-kind host adapter yet
   (`HostKind` declares `"local"` but nothing implements it), so scanning is
   SSH-only for now, a real declared limitation rather than a stub.
-- Reason: guessing at unverified `PackageName` strings for 15 of the 20
+- Reason: guessing at unverified `PackageName` strings for 17 of the 22
   required families would have violated this project's "verify, don't
   guess" bar for external protocol/format details; substring-matching
   against the human-readable `DisplayName` Stability Matrix already shows
@@ -832,7 +832,48 @@ Format: decision / reason / alternatives / consequences.
 - Consequences: a family whose real `PackageName`/`DisplayName` doesn't
   contain any of its declared patterns (e.g. a heavily renamed fork) will
   misclassify as `unknown/custom` rather than crash — the safe failure mode
-  SPEC calls for. Revisit the 15 unverified families' patterns against a
+  SPEC calls for. Revisit the 17 unverified families' patterns against a
   real Stability Matrix installation or updated source once available.
   Local-host and Node-adapter scanning are follow-on work, not silently
   promised here.
+
+## D-045 — Engine capability model: declarative catalog, `implemented=False` everywhere until a real adapter lands
+- Decision: CRE-002 extends `CreativePackageFamily` (already CRE-001's
+  22-entry family catalog: 7 SD-WebUI + 6 Fooocus + 3 node/workflow + 2
+  other-inference + 3 training + 1 video = 22) with the fields SPEC/
+  CREATIVE_COMPUTE.md's "Platform behavior" section calls for:
+  `acceleration_backends`, `api_strategy` (SPEC's 5-tier integration
+  hierarchy: `native_api` → `compat_layer` → `http_adapter` → `launch_fs` →
+  `read_only`), `launch_strategy` (uniformly `"managed_process"` — every
+  Stability-Matrix-managed package is launched via its own stored
+  `LaunchCommand`, verified in CRE-001's research, so this isn't a
+  simplification), `asset_types`, and `capability_set`. Tier assignment
+  follows SPEC's own per-engine guidance directly: ComfyUI is `http_adapter`
+  (SPEC requires a first-class HTTP/WS adapter); AUTOMATIC1111 and its
+  forks/compatible UIs are `compat_layer` (the shared community web API);
+  InvokeAI is `native_api` and explicitly does **not** share A1111's
+  `capability_set` (SPEC: "do not assume A1111 compatibility"); Fooocus-
+  family and training engines (Kohya/OneTrainer/FluxGym) are `launch_fs`
+  (SPEC: prefer launch/health/read-only unless a real API is detected;
+  training is Jobs, "not implicitly available to LLM agents"). Every family
+  is `implemented=False` — CRE-002 builds only the *declarative* capability
+  model; no live engine communication exists until CRE-003 (ComfyUI) and
+  later tasks add real adapters one engine at a time. `GET /creative/
+  engines/{id}/settings-schema` (reusing CP-002's `SettingsSchema`) exposes
+  only `extra_launch_args` — the one genuinely real, Stability-Matrix-backed
+  settings concept — rather than fabricating engine-specific fields nothing
+  reads yet.
+- Reason: CRE-002's acceptance bar is explicit — "engines show real
+  capability level; no fake controls." Separating *documented capability*
+  (`capability_set`, sourced from SPEC's own per-engine requirements) from
+  *actually wired up* (`implemented`) is what makes that distinction
+  checkable rather than a matter of trust; a caller can render "ComfyUI
+  supports workflow submission" and "Harness cannot submit one yet" as two
+  different, both-true facts.
+- Consequences: `capability_set`/`asset_types` values for the 17 families
+  whose exact behavior isn't independently verified (see D-044) are SPEC-
+  derived, not vendor-confirmed — expected to need adjustment once a real
+  adapter for that family is built and its actual surface is discovered.
+  `GET /creative/engines*` needs no database table: the catalog is pure
+  declarative data, identical to how `harness.skills.superpowers.BUNDLES`
+  needs none either.

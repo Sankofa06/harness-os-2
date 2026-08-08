@@ -5,14 +5,15 @@ _Last updated: 2026-08-07_
 ## Current milestone
 Milestones 1-6 are all fully done (kernel, control plane, language compute,
 execution, agent runtime, MCP + Skills). Milestone 7 (Creative compute) is in
-progress: CRE-001 (Stability Matrix discovery) is done — see the note below.
-Next up is CRE-002 (Engine capability model).
+progress: CRE-001 (Stability Matrix discovery) and CRE-002 (Engine
+capability model) are both done — see the notes below. Next up is CRE-003
+(ComfyUI deep adapter).
 
 CRE-001: `harness.providers.creative.families`/`discovery` parses Stability
 Matrix's `<DataDir>/settings.json` (verified via source inspection — its
 *only* per-install metadata; there's no per-package folder file) into
 `DiscoveredInstallation`s, classifying each against a data-driven family
-catalog covering all 20 SPEC-required package families by case-insensitive
+catalog covering all 22 SPEC-required package families by case-insensitive
 name-pattern matching (only 5 families' exact `PackageName` strings were
 independently verifiable; the rest match by `DisplayName`, honestly
 documented as such). An unmatched package becomes `unknown/custom` with its
@@ -23,6 +24,21 @@ now, since no local/Node host adapter exists yet. Proven against a real
 local SSH server (not mocks) plus 14 fixture-driven unit/integration tests,
 including a regression test proving `stable-diffusion-webui-forge` doesn't
 misclassify as bare AUTOMATIC1111 despite the substring overlap. See D-044.
+
+CRE-002: every family in the catalog now also declares
+`acceleration_backends`/`api_strategy`/`launch_strategy`/`asset_types`/
+`capability_set`, following SPEC's 5-tier integration hierarchy (native API
+→ compat layer → HTTP adapter → launch/fs → read-only) per SPEC's own
+per-engine guidance — ComfyUI is `http_adapter`, AUTOMATIC1111-compatible
+engines are `compat_layer`, InvokeAI is `native_api` and does NOT share
+A1111's capability set, Fooocus/training engines are `launch_fs`. Every
+family is honestly `implemented=False` — this is the declarative capability
+model only; no live engine adapter exists until CRE-003 lands. `GET
+/creative/engines`, `GET /creative/engines/{id}/capabilities`, and `GET
+/creative/engines/{id}/settings-schema` (reusing CP-002's `SettingsSchema`,
+exposing only the genuinely real `extra_launch_args` field) serve this
+catalog directly — no database table needed, same as `SKL-002`'s superpower
+bundles. See D-045.
 
 SKL-002: `harness.skills.superpowers.BUNDLES` declares the seven seed
 bundles (Coding, Git/GitHub, Browser, Creative, Research, Remote Host,
@@ -240,8 +256,8 @@ from persisted Runs/ToolRuns on every request rather than a separately
 maintained structure, so it can't drift from what actually happened.
 
 ## Active task
-CRE-001 is done (see Current milestone above). Next per `TASKS.md` is CRE-002
-(Engine capability model).
+CRE-001 and CRE-002 are both done (see Current milestone above). Next per
+`TASKS.md` is CRE-003 (ComfyUI deep adapter).
 
 ## Completed milestones
 - Phase 1: full spec-kit reading pass (all `SPEC/`, `ADR/`, `BUILD/`, `TESTING/`,
@@ -299,7 +315,7 @@ asyncio interaction, not an application bug.
 None.
 
 ## Architectural decisions made during implementation
-See `DECISIONS.md` for the full list (D-001 through D-044). Notable ones affecting
+See `DECISIONS.md` for the full list (D-001 through D-045). Notable ones affecting
 what's built so far:
 - D-003/D-004: SQLAlchemy async + plain SQL migrations, schema grows incrementally
   per subsystem milestone rather than all at once.
@@ -314,8 +330,8 @@ what's built so far:
 - D-014: license selection is deferred to the project owner (placeholder in place).
 
 ## What is NOT yet built
-the rest of creative compute (engine capability model, ComfyUI/A1111 deep
-adapters, asset catalog, profiles, batch comparison, provenance),
+the rest of creative compute (live engine adapters — ComfyUI, A1111/Forge,
+etc. — asset catalog, profiles, batch comparison, provenance),
 analytics/benchmarks, the Node daemon, the rest of the WebUI (graph/compute/
 models/creative/assets/analytics/approvals views, full three-panel IA,
 context meter, accessibility audit), TUI feature completion, demo mode
@@ -350,7 +366,7 @@ HARNESS_DEMO_MODE=1 uv run harness serve
 
 Test suites:
 ```bash
-uv run pytest tests -q                      # backend: 320 tests
+uv run pytest tests -q                      # backend: 335 tests
 cd web && npm run test                      # web unit: vitest
 cd web && npx playwright test               # web e2e (needs both servers running)
 ```
