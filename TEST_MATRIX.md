@@ -98,8 +98,8 @@ names; file paths may evolve. Status: PLANNED / IMPLEMENTED / PASSING.
 | Artifact provenance | `tests/creative/test_provenance.py` | PLANNED |
 
 ## Analytics
-| Run persists tokens/duration/model/contact/binding | `tests/analytics/test_run_metrics.py` | PLANNED |
-| tok/s + TTFT stored | same | PLANNED |
+| Run persists tokens/duration/model/contact/binding (ANA-001); failed/canceled runs persist an outcome + duration too, not only successful ones | `tests/unit/test_run_metrics_capture.py`, `tests/unit/test_runloop_cost.py` | PASSING |
+| tok/s + TTFT stored when calculable, via a fixture provider with real measurable delays | `tests/unit/test_run_metrics_capture.py` | PASSING |
 | Tool metrics stored | `tests/analytics/test_tool_metrics.py` | PLANNED |
 | Host telemetry visualized | Playwright `compute.spec.ts` | PLANNED |
 | Creative metrics stored | `tests/analytics/test_creative_metrics.py` | PLANNED |

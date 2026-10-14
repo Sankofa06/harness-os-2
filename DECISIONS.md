@@ -1161,3 +1161,48 @@ Format: decision / reason / alternatives / consequences.
   doesn't exist on the target engine fails at generation time with
   whatever error A1111 itself returns, not earlier. Cross-referencing
   profiles against the asset catalog is future work, not assumed here.
+
+## D-051 — ANA-001 closed out: failed/canceled runs now persist metrics too; a cancellation-vs-DB-pool fragility was found and documented, not silently worked around
+- Decision: most of ANA-001's mechanism already existed from the AGT-005
+  vertical slice — `run_contact` (`harness/agents/runloop.py`) already
+  called `app.runs.save_metrics(RunMetrics(...))` with input/output
+  tokens, TTFT, tok/s, duration, finish_reason, and cost on every
+  *successful* run, and every run already persists a `binding_snapshot`
+  (provider/model/inference_host/execution_host) plus its `contact_id` —
+  together already satisfying DoD Analytics bullets 1-2 ("every inference
+  run persists tokens/duration/model/contact/binding"; "tok/s and TTFT
+  stored when available/calculable") for the success path. What was
+  missing, and what this closes: a **canceled or failed run never wrote a
+  `run_metrics` row at all** — `get_metrics(run_id)` returned `None` for
+  anything but a success, which would have made failure-rate analytics
+  (SPEC's Dashboard "failure rates" bullet, ANA-003's job) structurally
+  impossible to build later. Both the `except asyncio.CancelledError` and
+  `except Exception` branches now call `save_metrics` with whatever
+  duration elapsed and `outcome="canceled"`/`"failed"` before re-raising/
+  returning — `run_metrics.run_id` is the table's primary key, so this is
+  a clean single write per run regardless of which path it takes.
+- **A real fragility was found while writing the canceled-run test, and
+  is recorded here rather than quietly worked around**: canceling a task
+  at a moment when it happens to be inside a `Database` call (not just
+  inside the provider's own wait) can invalidate SQLite's single pooled
+  `:memory:`/file connection, and the next query after that lands on a
+  freshly-reconnected, schema-less database (`no such table: run_metrics`)
+  — D-030's `asyncio.Lock` serializes *concurrent* DB callers but does
+  nothing to protect a task's *own* in-flight DB call from being
+  invalidated by cancellation delivered to that same task. The test
+  (`test_canceled_run_persists_canceled_outcome`) avoids the race by using
+  a fixture provider with a 2s delay and canceling only after a 0.3s
+  margin — comfortably past the ~10 sequential DB round-trips
+  `run_contact` makes before it ever reaches the provider — rather than
+  by fixing the underlying DB-layer gap, which is a real but separate
+  problem (full cancellation-safety for every in-flight `Database` call)
+  outside ANA-001's scope. Flagging it here rather than letting the test
+  quietly dodge it unexplained.
+- Reason: SPEC explicitly lists "outcome status" as a captured field and
+  the Dashboard requires failure rates — a metrics system that only ever
+  records successes cannot honestly claim either.
+- Consequences: a future task touching `Database`/cancellation safety
+  (plausibly folded into ANA-002's host-telemetry background work, which
+  will have its own long-lived cancelable loops hitting the same DB)
+  should treat this as a known, reproducible gap, not rediscover it from
+  scratch.

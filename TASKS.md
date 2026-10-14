@@ -412,7 +412,7 @@ Task format: ID — title / description / deps / components / acceptance / tests
 - Desc: run_metrics capture per SPEC/ANALYTICS_BENCHMARKS.md (tokens, TTFT, tok/s, durations, tools, cost when reported, outcome).
 - Deps: AGT-005. Components: analytics.
 - Acceptance: DoD Analytics bullets 1–2.
-- Tests: metric capture tests. Status: TODO
+- Tests: metric capture tests. Status: DONE
 
 ### ANA-002 Host metrics time-series
 - Desc: host_samples bounded/configurable retention; ingestion from node + SSH probes.

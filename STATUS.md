@@ -5,8 +5,10 @@ _Last updated: 2026-08-07_
 ## Current milestone
 Milestones 1-6 are all fully done (kernel, control plane, language compute,
 execution, agent runtime, MCP + Skills). Milestone 7 (Creative compute) is in
-progress: CRE-001 through CRE-007 are all done — see the notes below. Next
-up is CRE-008 (Batch comparison).
+progress: CRE-001 through CRE-007 are all done — see the notes below.
+CRE-008 (Batch comparison) depends on ANA-001 (Milestone 8), so ANA-001 was
+done out of sequence to unblock it; ANA-001 is also fully done — see its
+note below. Next up is CRE-008.
 
 CRE-001: `harness.providers.creative.families`/`discovery` parses Stability
 Matrix's `<DataDir>/settings.json` (verified via source inspection — its
@@ -153,6 +155,22 @@ but drives no engine-selection behavior yet — there's no live
 Proven end to end against real local fixture A1111/ComfyUI servers,
 including that explicit request params override a profile's defaults.
 See D-050.
+
+ANA-001 (done out of sequence to unblock CRE-008): most of the mechanism
+already existed from the AGT-005 vertical slice — `run_contact` already
+persisted tokens/TTFT/tok-per-sec/duration/finish_reason/cost to
+`run_metrics` on every successful run, and every run already persists a
+binding_snapshot (provider/model/inference_host/execution_host) plus its
+contact_id, satisfying DoD Analytics bullets 1-2 for the success path.
+What was missing: a canceled or failed run never wrote a `run_metrics`
+row at all, which would have made failure-rate analytics (ANA-003)
+structurally impossible later. Both the cancellation and exception
+branches in `run_contact` now persist an outcome + duration too. A real
+fragility was found and documented (not silently worked around) while
+testing this: canceling a task mid-DB-call can invalidate SQLite's single
+pooled connection, surfacing as "no such table" on the next query — D-030's
+lock serializes concurrent callers but doesn't protect a task's own
+in-flight call from its own cancellation. See D-051.
 
 SKL-002: `harness.skills.superpowers.BUNDLES` declares the seven seed
 bundles (Coding, Git/GitHub, Browser, Creative, Research, Remote Host,
@@ -370,8 +388,8 @@ from persisted Runs/ToolRuns on every request rather than a separately
 maintained structure, so it can't drift from what actually happened.
 
 ## Active task
-CRE-001 through CRE-007 are all done (see Current milestone above). Next per
-`TASKS.md` is CRE-008 (Batch comparison).
+CRE-001 through CRE-007 and ANA-001 are all done (see Current milestone
+above). Next per `TASKS.md` is CRE-008 (Batch comparison).
 
 ## Completed milestones
 - Phase 1: full spec-kit reading pass (all `SPEC/`, `ADR/`, `BUILD/`, `TESTING/`,
@@ -429,7 +447,7 @@ asyncio interaction, not an application bug.
 None.
 
 ## Architectural decisions made during implementation
-See `DECISIONS.md` for the full list (D-001 through D-050). Notable ones affecting
+See `DECISIONS.md` for the full list (D-001 through D-051). Notable ones affecting
 what's built so far:
 - D-003/D-004: SQLAlchemy async + plain SQL migrations, schema grows incrementally
   per subsystem milestone rather than all at once.
@@ -479,7 +497,7 @@ HARNESS_DEMO_MODE=1 uv run harness serve
 
 Test suites:
 ```bash
-uv run pytest tests -q                      # backend: 413 tests
+uv run pytest tests -q                      # backend: 416 tests
 cd web && npm run test                      # web unit: vitest
 cd web && npx playwright test               # web e2e (needs both servers running)
 ```

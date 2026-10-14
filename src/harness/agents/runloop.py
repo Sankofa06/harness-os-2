@@ -118,6 +118,7 @@ async def run_contact(
     )
     resource = EventResource(type="run", id=run.id)
     context = {"session_id": session_id}
+    run_started_at = time.monotonic()
 
     if parent_run_id is not None:
         # AGT-006: a delegated run additionally announces itself as a spawn, so
@@ -310,6 +311,18 @@ async def run_contact(
         )
 
     except asyncio.CancelledError:
+        # ANA-001: a canceled run still gets a `run_metrics` row (outcome +
+        # whatever duration elapsed) -- SPEC's "every inference run persists
+        # ... outcome status" and the eventual failure-rate dashboard
+        # (ANA-003) both need canceled/failed runs represented, not just
+        # successful ones.
+        await app.runs.save_metrics(
+            RunMetrics(
+                run_id=run.id,
+                duration_ms=(time.monotonic() - run_started_at) * 1000,
+                outcome="canceled",
+            )
+        )
         await app.runs.set_status(run.id, "canceled")
         await app.publish(
             Event(
@@ -323,6 +336,13 @@ async def run_contact(
         raise
 
     except Exception as exc:
+        await app.runs.save_metrics(
+            RunMetrics(
+                run_id=run.id,
+                duration_ms=(time.monotonic() - run_started_at) * 1000,
+                outcome="failed",
+            )
+        )
         await app.runs.set_status(run.id, "failed", error=str(exc))
         await app.publish(
             Event(
