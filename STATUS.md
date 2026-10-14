@@ -6,8 +6,9 @@ _Last updated: 2026-08-07_
 Milestones 1-6 are all fully done (kernel, control plane, language compute,
 execution, agent runtime, MCP + Skills). Milestone 7 (Creative compute) is in
 progress: CRE-001 (Stability Matrix discovery), CRE-002 (Engine capability
-model), and CRE-003 (ComfyUI deep adapter) are all done — see the notes
-below. Next up is CRE-004 (A1111/Forge compatible adapter).
+model), CRE-003 (ComfyUI deep adapter), and CRE-004 (A1111/Forge-compatible
+adapter) are all done — see the notes below. Next up is CRE-005 (remaining
+families at honest levels).
 
 CRE-001: `harness.providers.creative.families`/`discovery` parses Stability
 Matrix's `<DataDir>/settings.json` (verified via source inspection — its
@@ -49,10 +50,9 @@ Job (JOB-001): store the workflow as an Artifact *before* submitting
 (SPEC: never inline workflow JSON into context), submit, stream WS progress
 into Harness events + job progress, capture each output image as its own
 Artifact. `POST /creative/workflows`/`GET /creative/workflows` and
-`POST /creative/jobs`/`GET /creative/jobs` expose this; `engine_id` is a
-`Literal["comfyui"]` so no engine without a real adapter can be requested.
-`comfyui`'s `implemented` flag in the CRE-002 catalog is now `true` — the
-only family this is true for. Testing against a real local fixture ComfyUI
+`POST /creative/jobs`/`GET /creative/jobs` expose this; only engines with a
+real adapter can be requested. `comfyui`'s `implemented` flag in the CRE-002
+catalog is now `true`. Testing against a real local fixture ComfyUI
 server (uvicorn + real WebSocket, not mocks) caught a genuine ordering bug
 before it shipped: the client must open its WebSocket and confirm
 registration *before* submitting, since ComfyUI starts executing (and
@@ -60,6 +60,31 @@ pushing progress with no replay) the instant `/prompt` returns — connecting
 after submission silently dropped every early event in a real run. See
 D-046 (also covers the same ordering-tiebreaker fix as D-043, applied to
 `ArtifactRepo`/`JobRepo`).
+
+CRE-004: `harness.providers.creative.a1111` is one shared adapter for all
+seven `sd_webui`-group families (AUTOMATIC1111, Forge, reForge, AMDGPU
+Forge, WebUI-UX, SD.Next, A1111 DirectML) — SPEC frames them as speaking
+one "common web API," not seven separate engines. `A1111Client` hand-rolls
+the verified real `/sdapi/v1/*` endpoint set and treats any 404 as a clean
+`UnsupportedCapabilityError` rather than a crash — the literal meaning of
+"capability-negotiated." `/sdapi/v1/loras` and `/sdapi/v1/schedulers` are
+the two endpoints research found real evidence can be absent (loras is
+extension-registered, not core `api.py`); `discover_capabilities()` probes
+every read-only endpoint directly to build an honest per-instance
+capability set. Unlike ComfyUI's push-based WebSocket, A1111's
+`/sdapi/v1/progress` is poll-only (verified via source), so
+`a1111.adapter.run_a1111_generation` reports progress via a concurrent
+polling task instead of forcing a push shape the protocol doesn't have;
+canceling the Harness Job also calls the engine's own `/sdapi/v1/interrupt`
+so stopping the Job really stops the remote generation. `POST /creative/
+jobs` now branches on `engine_id`: ComfyUI's workflow-graph shape
+(`workflow`/`workflow_artifact_id`) vs the A1111-compatible family's
+direct-call shape (`operation`/`params`) — two genuinely different request
+shapes, not forced into one. Proven against a real local fixture A1111
+server, including a variant that omits endpoints entirely to prove
+generation still succeeds when only unrelated capabilities are missing, and
+fails cleanly (not a crash) when the actually-requested operation is
+missing. See D-047.
 
 SKL-002: `harness.skills.superpowers.BUNDLES` declares the seven seed
 bundles (Coding, Git/GitHub, Browser, Creative, Research, Remote Host,
@@ -277,8 +302,8 @@ from persisted Runs/ToolRuns on every request rather than a separately
 maintained structure, so it can't drift from what actually happened.
 
 ## Active task
-CRE-001, CRE-002, and CRE-003 are all done (see Current milestone above).
-Next per `TASKS.md` is CRE-004 (A1111/Forge compatible adapter).
+CRE-001 through CRE-004 are all done (see Current milestone above). Next per
+`TASKS.md` is CRE-005 (remaining families at honest levels).
 
 ## Completed milestones
 - Phase 1: full spec-kit reading pass (all `SPEC/`, `ADR/`, `BUILD/`, `TESTING/`,
@@ -336,7 +361,7 @@ asyncio interaction, not an application bug.
 None.
 
 ## Architectural decisions made during implementation
-See `DECISIONS.md` for the full list (D-001 through D-046). Notable ones affecting
+See `DECISIONS.md` for the full list (D-001 through D-047). Notable ones affecting
 what's built so far:
 - D-003/D-004: SQLAlchemy async + plain SQL migrations, schema grows incrementally
   per subsystem milestone rather than all at once.
@@ -351,8 +376,8 @@ what's built so far:
 - D-014: license selection is deferred to the project owner (placeholder in place).
 
 ## What is NOT yet built
-the rest of creative compute (A1111/Forge-compatible adapter and remaining
-engine families, asset catalog, profiles, batch comparison, provenance),
+the rest of creative compute (remaining engine families at honest read-only/
+launch levels, asset catalog, profiles, batch comparison, provenance),
 analytics/benchmarks, the Node daemon, the rest of the WebUI (graph/compute/
 models/creative/assets/analytics/approvals views, full three-panel IA,
 context meter, accessibility audit), TUI feature completion, demo mode
@@ -387,7 +412,7 @@ HARNESS_DEMO_MODE=1 uv run harness serve
 
 Test suites:
 ```bash
-uv run pytest tests -q                      # backend: 354 tests
+uv run pytest tests -q                      # backend: 374 tests
 cd web && npm run test                      # web unit: vitest
 cd web && npx playwright test               # web e2e (needs both servers running)
 ```

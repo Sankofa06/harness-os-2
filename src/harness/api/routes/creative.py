@@ -1,5 +1,5 @@
 """Stability Matrix installation discovery + engine capability model +
-ComfyUI generation endpoints (CRE-001/CRE-002/CRE-003,
+ComfyUI/A1111 generation endpoints (CRE-001/CRE-002/CRE-003/CRE-004,
 SPEC/CREATIVE_COMPUTE.md, SPEC/API_CONTRACT.md).
 
 Discovery reads `<data_dir>/settings.json` from a registered SSH Host via
@@ -10,13 +10,17 @@ is SSH-only today; that's a real, declared limitation, not a placeholder.
 
 The `/creative/engines*` routes serve `harness.providers.creative.families`'s
 declarative catalog directly — every engine's `implemented` field reflects
-whether a live adapter actually exists (only ComfyUI's does, as of CRE-003).
+whether a live adapter actually exists (ComfyUI since CRE-003; the
+AUTOMATIC1111-compatible family since CRE-004).
 
 `/creative/workflows` stores a workflow graph as an Artifact (ART-001) —
 referenced by id, never inlined into any LLM-facing context.
-`POST /creative/jobs` runs one generation as a Job (JOB-001); only
-`engine_id="comfyui"` is accepted, since that's the only engine with a real
-adapter — accepting any other id here would itself be a fake control.
+`POST /creative/jobs` runs one generation as a Job (JOB-001); only engines
+with a real adapter are accepted — accepting any other id here would itself
+be a fake control. ComfyUI's job is workflow-graph-based (`workflow`/
+`workflow_artifact_id`); the A1111-compatible family's is a direct
+txt2img/img2img call (`operation`/`params`) — the two protocols are
+genuinely different shapes, not forced into one.
 """
 
 from __future__ import annotations
@@ -36,11 +40,24 @@ from harness.core.settings_schema import SettingsSchema
 from harness.hosts.resolve import build_ssh_host
 from harness.jobs.manager import JobHandle
 from harness.jobs.model import Job
+from harness.providers.creative.a1111.adapter import run_a1111_generation
 from harness.providers.creative.comfyui.adapter import run_comfyui_generation
 from harness.providers.creative.discovery import parse_installed_packages
 from harness.providers.creative.families import FAMILIES, FAMILIES_BY_ID
 
 router = APIRouter(dependencies=[Depends(require_auth)], tags=["creative"])
+
+_A1111_COMPATIBLE_ENGINE_IDS = frozenset(
+    {
+        "automatic1111",
+        "sdwebui_forge",
+        "sdwebui_reforge",
+        "sdwebui_amdgpu_forge",
+        "sdwebui_ux",
+        "sdnext",
+        "automatic1111_directml",
+    }
+)
 
 
 def _app(request: Request) -> Application:
@@ -187,42 +204,81 @@ async def list_workflows(request: Request) -> list[Artifact]:
 
 
 class CreativeJobRequest(BaseModel):
-    engine_id: Literal["comfyui"]
+    engine_id: Literal[
+        "comfyui",
+        "automatic1111",
+        "sdwebui_forge",
+        "sdwebui_reforge",
+        "sdwebui_amdgpu_forge",
+        "sdwebui_ux",
+        "sdnext",
+        "automatic1111_directml",
+    ]
     base_url: str
+    # ComfyUI (workflow-graph based):
     workflow: dict[str, Any] | None = None
     workflow_artifact_id: str | None = None
+    # AUTOMATIC1111-compatible (direct txt2img/img2img call):
+    operation: Literal["txt2img", "img2img"] | None = None
+    params: dict[str, Any] | None = None
     session_id: str | None = None
     workspace_id: str | None = None
 
 
 @router.post("/creative/jobs", status_code=202)
 async def submit_creative_job(request: Request, body: CreativeJobRequest) -> Job:
-    """Only `engine_id="comfyui"` is accepted — the `Literal` type itself
-    enforces that (FastAPI 422s any other value), so this endpoint can never
-    accept a request for an engine with no real adapter.
+    """Only engines with a real adapter are accepted — the `Literal` type
+    itself enforces that (FastAPI 422s any other value), so this endpoint
+    can never accept a request for an engine with no real adapter.
     """
     app = _app(request)
-    if body.workflow is not None:
-        graph = body.workflow
-    elif body.workflow_artifact_id is not None:
-        artifact = await app.artifacts.get(body.workflow_artifact_id)  # 404s if unknown
-        graph = json.loads(app.artifact_blobs.get(artifact.sha256))
-    else:
-        raise ValidationFailedError("either workflow or workflow_artifact_id is required")
 
-    async def work(handle: JobHandle) -> dict[str, Any]:
-        return await run_comfyui_generation(
+    if body.engine_id == "comfyui":
+        if body.workflow is not None:
+            graph = body.workflow
+        elif body.workflow_artifact_id is not None:
+            artifact = await app.artifacts.get(body.workflow_artifact_id)  # 404s if unknown
+            graph = json.loads(app.artifact_blobs.get(artifact.sha256))
+        else:
+            raise ValidationFailedError("either workflow or workflow_artifact_id is required")
+
+        async def comfyui_work(handle: JobHandle) -> dict[str, Any]:
+            return await run_comfyui_generation(
+                app,
+                handle,
+                base_url=body.base_url,
+                workflow=graph,
+                session_id=body.session_id,
+                workspace_id=body.workspace_id,
+            )
+
+        return await app.job_manager.submit("creative.comfyui.generate", comfyui_work)
+
+    assert body.engine_id in _A1111_COMPATIBLE_ENGINE_IDS  # the only other Literal values
+    if body.operation is None or body.params is None:
+        raise ValidationFailedError(
+            "operation and params are required for an AUTOMATIC1111-compatible engine"
+        )
+    engine_id = body.engine_id
+    operation = body.operation
+    params = body.params
+
+    async def a1111_work(handle: JobHandle) -> dict[str, Any]:
+        return await run_a1111_generation(
             app,
             handle,
             base_url=body.base_url,
-            workflow=graph,
+            engine_id=engine_id,
+            operation=operation,
+            params=params,
             session_id=body.session_id,
             workspace_id=body.workspace_id,
         )
 
-    return await app.job_manager.submit("creative.comfyui.generate", work)
+    return await app.job_manager.submit("creative.a1111.generate", a1111_work)
 
 
 @router.get("/creative/jobs")
 async def list_creative_jobs(request: Request) -> list[Job]:
-    return await _app(request).jobs.list(job_type="creative.comfyui.generate")
+    jobs = await _app(request).jobs.list()
+    return [j for j in jobs if j.type.startswith("creative.")]

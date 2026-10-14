@@ -76,13 +76,14 @@ _SD_WEBUI_CAPABILITIES = (
     "txt2img",
     "img2img",
     "options",
-    "samplers_schedulers",
-    "models_checkpoints",
-    "vaes",
+    "samplers",
+    "schedulers",
+    "sd_models",
+    "sd_vae",
     "loras",
     "progress",
     "interrupt",
-    "extras_upscale",
+    "extras",
 )
 
 _FOOOCUS_ASSET_TYPES = ("checkpoint", "lora", "vae", "image")
@@ -153,6 +154,7 @@ FAMILIES: tuple[CreativePackageFamily, ...] = (
         api_strategy="compat_layer",
         asset_types=_SD_WEBUI_ASSET_TYPES,
         capability_set=_SD_WEBUI_CAPABILITIES,
+        implemented=True,
     ),
     CreativePackageFamily(
         id="sdwebui_amdgpu_forge",
@@ -164,6 +166,7 @@ FAMILIES: tuple[CreativePackageFamily, ...] = (
         api_strategy="compat_layer",
         asset_types=_SD_WEBUI_ASSET_TYPES,
         capability_set=_SD_WEBUI_CAPABILITIES,
+        implemented=True,
     ),
     CreativePackageFamily(
         id="sdwebui_forge",
@@ -175,6 +178,7 @@ FAMILIES: tuple[CreativePackageFamily, ...] = (
         api_strategy="compat_layer",
         asset_types=_SD_WEBUI_ASSET_TYPES,
         capability_set=_SD_WEBUI_CAPABILITIES,
+        implemented=True,
     ),
     CreativePackageFamily(
         id="automatic1111_directml",
@@ -186,6 +190,7 @@ FAMILIES: tuple[CreativePackageFamily, ...] = (
         api_strategy="compat_layer",
         asset_types=_SD_WEBUI_ASSET_TYPES,
         capability_set=_SD_WEBUI_CAPABILITIES,
+        implemented=True,
     ),
     CreativePackageFamily(
         id="sdwebui_ux",
@@ -197,6 +202,7 @@ FAMILIES: tuple[CreativePackageFamily, ...] = (
         api_strategy="compat_layer",
         asset_types=_SD_WEBUI_ASSET_TYPES,
         capability_set=_SD_WEBUI_CAPABILITIES,
+        implemented=True,
     ),
     CreativePackageFamily(
         id="sdnext",
@@ -208,6 +214,7 @@ FAMILIES: tuple[CreativePackageFamily, ...] = (
         api_strategy="compat_layer",
         asset_types=_SD_WEBUI_ASSET_TYPES,
         capability_set=_SD_WEBUI_CAPABILITIES,
+        implemented=True,
     ),
     CreativePackageFamily(
         id="automatic1111",
@@ -219,6 +226,11 @@ FAMILIES: tuple[CreativePackageFamily, ...] = (
         api_strategy="compat_layer",
         asset_types=_SD_WEBUI_ASSET_TYPES,
         capability_set=_SD_WEBUI_CAPABILITIES,
+        # CRE-004 added one real shared adapter (harness.providers.creative.
+        # a1111) for every sd_webui-group family above — they all speak the
+        # same "common web API" SPEC describes, capability-negotiated per
+        # instance rather than assumed.
+        implemented=True,
     ),
     CreativePackageFamily(
         id="fooocus_mre",
@@ -296,8 +308,7 @@ FAMILIES: tuple[CreativePackageFamily, ...] = (
         api_strategy="http_adapter",
         asset_types=_NODE_WORKFLOW_ASSET_TYPES,
         capability_set=_COMFYUI_CAPABILITIES,
-        # CRE-003 added a real live adapter (harness.providers.creative.comfyui) —
-        # the only family this is true for so far.
+        # CRE-003 added a real live adapter (harness.providers.creative.comfyui).
         implemented=True,
     ),
     CreativePackageFamily(

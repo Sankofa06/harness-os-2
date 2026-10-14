@@ -30,10 +30,21 @@ def test_every_family_declares_a_full_capability_model() -> None:
 def test_no_fake_controls_only_families_with_a_real_adapter_are_implemented() -> None:
     """CRE-002's acceptance bar: `implemented` must track whether a live
     adapter actually exists, not what's merely declared possible. As of
-    CRE-003, ComfyUI is the only family with one.
+    CRE-004, ComfyUI (CRE-003) and the seven sd_webui-group families sharing
+    the AUTOMATIC1111-compatible adapter (CRE-004) have one; nothing else
+    does yet.
     """
     implemented_ids = {f.id for f in FAMILIES if f.implemented}
-    assert implemented_ids == {"comfyui"}
+    assert implemented_ids == {
+        "comfyui",
+        "automatic1111",
+        "sdwebui_forge",
+        "sdwebui_reforge",
+        "sdwebui_amdgpu_forge",
+        "sdwebui_ux",
+        "sdnext",
+        "automatic1111_directml",
+    }
 
 
 def test_comfyui_is_http_adapter_tier_with_deep_capabilities() -> None:
@@ -47,7 +58,7 @@ def test_comfyui_is_http_adapter_tier_with_deep_capabilities() -> None:
 def test_automatic1111_compatible_family_is_compat_layer_tier() -> None:
     a1111 = FAMILIES_BY_ID["automatic1111"]
     assert a1111.api_strategy == "compat_layer"
-    assert {"txt2img", "img2img", "loras", "vaes"} <= set(a1111.capability_set)
+    assert {"txt2img", "img2img", "loras", "sd_vae"} <= set(a1111.capability_set)
 
 
 def test_invokeai_is_native_api_tier_not_assumed_a1111_compatible() -> None:

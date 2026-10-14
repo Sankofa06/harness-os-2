@@ -90,7 +90,7 @@ names; file paths may evolve. Status: PLANNED / IMPLEMENTED / PASSING.
 | Installed package catalog shows package type/platform (family_id/family_group/platform_supported per installation) | `tests/creative/test_discovery.py`, `tests/api/test_creative.py` | PASSING |
 | Per-engine capability model (supported_platforms/acceleration_backends/api_strategy/launch_strategy/asset_types/capability_set) matches SPEC's integration hierarchy; no engine claims `implemented` before a real adapter exists | `tests/creative/test_capability_model.py`, `tests/api/test_creative_engines.py` | PASSING |
 | ComfyUI health/object-info/queue/submit/progress-WS/interrupt/history/upload/output-capture; workflow JSON stored by reference, never inlined; execution errors fail the job cleanly | `tests/creative/test_comfyui_client.py`, `tests/api/test_creative_comfyui.py` vs real local fixture ComfyUI server (uvicorn + real WebSocket) | PASSING |
-| A1111-style capability negotiation | `tests/creative/test_a1111.py` | PLANNED |
+| A1111-compatible txt2img/img2img/options/samplers/schedulers/sd-models/sd-vae/loras/progress/interrupt/extras; capability-negotiated (404 -> clean UnsupportedCapabilityError, not a crash) against a server exposing only partial capabilities | `tests/creative/test_a1111_client.py`, `tests/api/test_creative_a1111.py` vs real local fixture A1111 server | PASSING |
 | Asset dedupe | `tests/creative/test_assets.py` | PLANNED |
 | Creative Profile works | `tests/creative/test_profiles.py` | PLANNED |
 | Batch comparison deterministic | `tests/creative/test_batch.py` | PLANNED |

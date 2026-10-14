@@ -923,3 +923,59 @@ Format: decision / reason / alternatives / consequences.
   `ComfyUIClient` directly but not wired into the generation flow or any
   REST route yet — a caller using the client library has them; nothing in
   the API surface calls them today.
+
+## D-047 — A1111-compatible adapter: 404-as-capability-signal, poll-based progress, one adapter for seven families
+- Decision: `harness.providers.creative.a1111.client.A1111Client` is a
+  hand-rolled httpx client against AUTOMATIC1111 WebUI's real `/sdapi/v1/*`
+  API (verified via source inspection of `modules/api/api.py`/`models.py`
+  and the built-in LoRA extension — no published spec exists). Every call
+  treats a 404 from the server as "this endpoint genuinely doesn't exist on
+  this build," translating it to `UnsupportedCapabilityError` rather than a
+  generic `ProviderError` — the literal meaning of CRE-004's "capability-
+  negotiated" acceptance bar. `/sdapi/v1/loras` and `/sdapi/v1/schedulers`
+  are the two endpoints research found real evidence can be absent (loras
+  is registered by a built-in *extension* via `on_app_started`, not core
+  `api.py`; schedulers is a separate, newer addition alongside `samplers`),
+  but every endpoint is translated the same way rather than special-cased,
+  since an unusual fork could drop any of them. `discover_capabilities()`
+  probes every read-only endpoint directly (side-effect-free, safe to call
+  eagerly) and reports `txt2img`/`img2img`/`interrupt`/`extras` present
+  whenever `options` responds, since those are core, mutating-by-design
+  routes with no verified real-world case of selective absence — probing
+  them would mean triggering a real generation just to check.
+
+  A1111's `/sdapi/v1/progress` is poll-only (confirmed via source) — there
+  is no push event to await the way ComfyUI's WebSocket has one, so
+  `harness.providers.creative.a1111.adapter.run_a1111_generation` reports
+  progress via a concurrent polling task (0.5s interval) racing the
+  txt2img/img2img call, not by forcing the protocol into ComfyUI's push
+  shape. Canceling the Harness Job also calls the engine's own
+  `/sdapi/v1/interrupt` before re-raising `CancelledError`, so stopping the
+  Job actually stops the remote generation, not just Harness's wait on it.
+
+  All seven `sd_webui`-group families sharing SPEC's "common web API"
+  (AUTOMATIC1111, Forge, reForge, AMDGPU Forge, WebUI-UX, SD.Next, A1111
+  DirectML) flip to `implemented=True` from this one adapter — `engine_id`
+  is still required per-request (for provenance/labeling in captured
+  Artifacts) but doesn't select different code, matching SPEC's framing
+  that it's "the common web API," not one engine, these all speak.
+  `CreativePackageFamily.capability_set`'s vocabulary was renamed to match
+  `discover_capabilities()`'s exactly (`samplers`/`schedulers`/`sd_models`/
+  `sd_vae`/`extras` instead of the earlier `samplers_schedulers`/
+  `models_checkpoints`/`vaes`/`extras_upscale`) so a caller can directly
+  diff an engine's *declared* capability set against what a live instance
+  actually negotiates.
+- Reason: "verify, don't guess" caught the same category of risk as D-046 —
+  assuming fork parity (e.g. that every A1111-compatible build has LoRA
+  listing) is exactly the kind of fake control CRE-004's acceptance bar
+  rules out. Modeling progress as poll-based rather than reusing ComfyUI's
+  push-based event shape keeps each adapter honest about the real protocol
+  it's talking to, rather than a false uniformity.
+- Consequences: `POST /creative/jobs` now branches on whether `engine_id`
+  is `"comfyui"` (workflow-graph shape: `workflow`/`workflow_artifact_id`)
+  or one of the seven A1111-compatible ids (direct-call shape:
+  `operation`/`params`) — two genuinely different request shapes under one
+  endpoint, not a forced common schema. `extra_single_image`/
+  `extra_batch_images`/`set_options` are implemented and tested on
+  `A1111Client` but, like ComfyUI's `interrupt`/`upload_image` (D-046), not
+  yet wired into the generation flow or a REST route.

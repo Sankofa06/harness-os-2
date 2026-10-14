@@ -372,7 +372,7 @@ Task format: ID — title / description / deps / components / acceptance / tests
 - Desc: txt2img/img2img/options/samplers/models/VAEs/LoRAs/progress/interrupt/extras where exposed; capability-negotiated.
 - Deps: CRE-002, ART-001. Components: providers.creative.
 - Acceptance: works vs fake A1111 server exposing partial capabilities.
-- Tests: fixture tests incl. missing-capability paths. Status: TODO
+- Tests: fixture tests incl. missing-capability paths. Status: DONE
 
 ### CRE-005 Remaining families at honest levels
 - Desc: InvokeAI native detection; Fooocus-family launch/health/read-only; training engines (Kohya/OneTrainer/FluxGym) as approval-gated Jobs; video family listed.

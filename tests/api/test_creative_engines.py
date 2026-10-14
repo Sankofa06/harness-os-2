@@ -14,9 +14,10 @@ async def test_list_engines_returns_all_families(client) -> None:
     engines = resp.json()
     assert len(engines) == 22
     by_id = {e["id"]: e for e in engines}
-    # Only ComfyUI has a real adapter (CRE-003) — everyone else stays honest.
+    # ComfyUI (CRE-003) and the AUTOMATIC1111-compatible family (CRE-004)
+    # have real adapters; everyone else stays honest.
     assert by_id["comfyui"]["implemented"] is True
-    assert by_id["automatic1111"]["implemented"] is False
+    assert by_id["automatic1111"]["implemented"] is True
     assert by_id["invokeai"]["implemented"] is False
 
 
@@ -48,6 +49,12 @@ async def test_engine_capabilities_endpoint_matches_engine_listing(client) -> No
     capabilities = (await client.get("/api/v1/creative/engines/automatic1111/capabilities")).json()
     assert capabilities["capability_set"] == engine["capability_set"]
     assert capabilities["asset_types"] == engine["asset_types"]
+    assert capabilities["implemented"] is True  # CRE-004 gave it a real adapter
+
+
+@pytest.mark.asyncio
+async def test_unimplemented_engine_capabilities_stay_honest(client) -> None:
+    capabilities = (await client.get("/api/v1/creative/engines/invokeai/capabilities")).json()
     assert capabilities["implemented"] is False
 
 
