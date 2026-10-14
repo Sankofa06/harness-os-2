@@ -10,11 +10,21 @@ referenced by id from here on (ART-001) — SPEC: "ComfyUI workflow JSON MUST
 NOT be injected into LLM context by default." Captured output images become
 Artifacts the same way, so a caller only ever sees `artifact://<id>`
 references, never inlined bytes.
+
+CRE-009 provenance here is deliberately lighter than the AUTOMATIC1111-
+compatible adapter's: a workflow graph is an arbitrary set of nodes with
+no schema Harness assumes, so checkpoint/seed/sampler/etc are not
+extracted from it (that would mean guessing which node's which input
+means what, for a graph shape that varies per workflow). What Harness
+genuinely knows -- engine/host/workflow reference/duration/timestamp -- is
+recorded; see `harness.providers.creative.provenance`'s docstring for the
+full scope boundary this shares with the batch comparison (CRE-008).
 """
 
 from __future__ import annotations
 
 import json
+import time
 import uuid
 from typing import Any
 
@@ -24,6 +34,7 @@ from harness.core.errors import ProviderError
 from harness.events.model import Event, EventResource
 from harness.jobs.manager import JobHandle
 from harness.providers.creative.comfyui.client import ComfyUIClient
+from harness.providers.creative.provenance import now_iso
 
 _TERMINAL_EVENT_TYPES = frozenset({"execution_success", "execution_error", "execution_interrupted"})
 
@@ -53,6 +64,7 @@ async def run_comfyui_generation(
         client_id = uuid.uuid4().hex
         resource = EventResource(type="job", id=handle.job_id)
         error_detail: dict[str, Any] | None = None
+        generation_started = time.monotonic()
 
         # Connect the WS *before* submitting: ComfyUI starts executing (and
         # pushing progress) as soon as POST /prompt returns, and there is no
@@ -96,6 +108,7 @@ async def run_comfyui_generation(
                 f"ComfyUI execution failed: {error_detail.get('exception_message', error_detail)}"
             )
 
+        duration_ms = (time.monotonic() - generation_started) * 1000
         history = await client.history(prompt_id)
         record = history.get(prompt_id, {})
         outputs = record.get("outputs", {})
@@ -121,6 +134,8 @@ async def run_comfyui_generation(
                         "prompt_id": prompt_id,
                         "workflow_artifact_id": workflow_artifact.id,
                         "node_id": node_id,
+                        "timestamp": now_iso(),
+                        "duration_ms": duration_ms,
                     },
                 )
                 output_artifact_ids.append(artifact.id)

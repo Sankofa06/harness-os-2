@@ -343,6 +343,7 @@ async def submit_creative_job(request: Request, body: CreativeJobRequest) -> Job
             params=params,
             session_id=body.session_id,
             workspace_id=body.workspace_id,
+            profile_id=body.profile_id,
         )
 
     return await app.job_manager.submit("creative.a1111.generate", a1111_work)

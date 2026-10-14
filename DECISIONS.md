@@ -1274,3 +1274,66 @@ Format: decision / reason / alternatives / consequences.
   polling and the batch's cells-completed-fraction updates can briefly
   interleave) are both left as known, undisguised limits rather than
   quietly worked around.
+
+## D-053 — Provenance: full record for the A1111-compatible family's flat fields; ComfyUI gets the honest lighter subset; checkpoint hash resolves against CRE-006's catalog by filename
+- Decision: every AUTOMATIC1111-compatible generation's output Artifact
+  now carries a full `GenerationProvenance` record
+  (`harness.providers.creative.provenance`) in its metadata: engine_id,
+  host (the `base_url` actually used), timestamp, duration_ms, profile_id,
+  checkpoint, checkpoint_hash, vae, loras, prompt, negative_prompt, seed,
+  sampler, scheduler, width, height, steps, cfg_scale. Every field is read
+  back out of the request's own `params` (built by CRE-007's
+  `merge_profile_params`) or the server's own response — none of it is
+  newly guessed:
+  - **Seed is the server's own reported value, not just the request's**:
+    A1111's `info` response field is itself a JSON string carrying the
+    actually-used seed, which matters whenever the request's seed was
+    `-1`/random — the provenance record prefers that over the request's
+    raw `seed` param whenever present, so a "random seed" generation
+    still gets an accurate, reproducible provenance record rather than
+    recording `-1`.
+  - **LoRAs are recovered from the final prompt string**: CRE-007 bakes a
+    profile's LoRAs into `<lora:name:weight>` prompt tags (A1111 has no
+    structured field for them); provenance parses that same tag format
+    back out via a regex and strips the tags from the recorded `prompt`
+    — reversing Harness's own representation, not guessing an external
+    one.
+  - **Checkpoint hash resolves against CRE-006's asset catalog by
+    filename** (`CreativeAssetRepo.find_by_filename`, new): if exactly
+    one distinct cataloged hash exists under that filename, it's
+    recorded; if none or more than one (a real possibility — two
+    different files can share a name), the field is simply omitted
+    rather than guessed. This is the first real use of CRE-006's catalog
+    beyond cataloging for its own sake, and deliberately conservative
+    about the ambiguous case.
+  - **`resource_metrics` and an engine version are both omitted, not
+    faked**: no GPU/VRAM telemetry exists yet for an arbitrary engine
+    instance (ANA-002/NODE-001's job), and neither engine exposes a
+    verified version endpoint this adapter calls.
+  - **ComfyUI gets a deliberately lighter, separately-declared subset**:
+    engine_id, base_url, timestamp, duration_ms, plus the existing
+    prompt_id/workflow_artifact_id/node_id — no checkpoint/seed/sampler/
+    dimensions/steps/CFG. A workflow graph is an arbitrary set of nodes
+    with no schema Harness assumes; extracting "the checkpoint" or "the
+    seed" from it would mean guessing which node's which input means
+    what for a layout that varies per workflow, exactly the kind of
+    unverified inference this project's discipline rules out. This
+    mirrors the identical scope boundary CRE-008's batch comparison
+    already drew for the same reason.
+  - `run_a1111_generation` gained one new optional parameter,
+    `profile_id`, threaded through from both call sites (the single-
+    generation route and CRE-008's batch module) purely so provenance
+    can record which profile (if any) drove a generation — `params`
+    itself, already merged by the time this function sees it, supplies
+    every other field.
+- Reason: SPEC's Provenance list is the DoD's literal acceptance bar
+  ("Output becomes Artifact with provenance"); recording it accurately
+  for the family whose fields are genuinely known, and declaring instead
+  of guessing for the one whose fields aren't, is the same honesty
+  standard every other CRE task this milestone has held to.
+- Consequences: a ComfyUI output's provenance will need real node-schema
+  research (verifying a specific, common workflow convention like
+  `CheckpointLoaderSimple`/`KSampler`'s input names from ComfyUI's own
+  source, matching CRE-003's research discipline) before it can carry
+  parameter-level fields — explicitly left as future work, not assumed
+  here.

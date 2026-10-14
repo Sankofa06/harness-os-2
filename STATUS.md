@@ -5,10 +5,10 @@ _Last updated: 2026-08-07_
 ## Current milestone
 Milestones 1-6 are all fully done (kernel, control plane, language compute,
 execution, agent runtime, MCP + Skills). Milestone 7 (Creative compute) is
-in progress: CRE-001 through CRE-008 are all done — see the notes below.
-ANA-001 (Milestone 8) was done out of sequence since CRE-008 depends on
-it; ANA-001 is also fully done — see its note below. Next up is CRE-009
-(Provenance).
+now fully done: CRE-001 through CRE-009 — see the notes below. ANA-001
+(Milestone 8) was done out of sequence since CRE-008 depends on it;
+ANA-001 is also fully done — see its note below. Next up is Milestone 8's
+remaining work, starting with ANA-002 (Host metrics time-series).
 
 CRE-001: `harness.providers.creative.families`/`discovery` parses Stability
 Matrix's `<DataDir>/settings.json` (verified via source inspection — its
@@ -194,6 +194,25 @@ helper was promoted to a shared, reusable function
 against two real local fixture A1111 servers: parallel scheduling splits
 4 cells 2-and-2 across two idle candidates; canceling the batch Job stops
 in-flight generations. See D-052.
+
+CRE-009: every AUTOMATIC1111-compatible output Artifact now carries a full
+provenance record (`harness.providers.creative.provenance`) — engine/host/
+profile/checkpoint+hash/VAE/LoRAs/prompt/negative-prompt/seed/sampler/
+scheduler/dimensions/steps/CFG/duration/timestamp — built entirely from
+the request's own merged params and the server's own response, never
+newly guessed. The seed recorded is the server's own reported value (A1111's
+`info` field), not just the request's, so a `-1`/random-seed generation
+still gets an accurate record. LoRAs are recovered by parsing Harness's own
+`<lora:name:weight>` prompt-tag format back out (CRE-007's own
+representation, not an external one). Checkpoint hash resolves against
+CRE-006's asset catalog by filename (`CreativeAssetRepo.find_by_filename`)
+when exactly one distinct hash is cataloged under that name; omitted, not
+guessed, otherwise. `resource_metrics` and an engine version are both
+omitted too — no GPU/VRAM telemetry exists yet, and neither engine exposes
+a verified version endpoint. ComfyUI gets a deliberately lighter,
+separately-tested subset (engine/host/workflow reference/duration/
+timestamp only) — the same workflow-graph-is-opaque boundary CRE-008 drew,
+for the same reason. See D-053.
 
 SKL-002: `harness.skills.superpowers.BUNDLES` declares the seven seed
 bundles (Coding, Git/GitHub, Browser, Creative, Research, Remote Host,
@@ -411,8 +430,9 @@ from persisted Runs/ToolRuns on every request rather than a separately
 maintained structure, so it can't drift from what actually happened.
 
 ## Active task
-CRE-001 through CRE-008 and ANA-001 are all done (see Current milestone
-above). Next per `TASKS.md` is CRE-009 (Provenance).
+CRE-001 through CRE-009 (Milestone 7, complete) and ANA-001 are all done
+(see Current milestone above). Next per `TASKS.md` is ANA-002 (Host
+metrics time-series).
 
 ## Completed milestones
 - Phase 1: full spec-kit reading pass (all `SPEC/`, `ADR/`, `BUILD/`, `TESTING/`,
@@ -470,7 +490,7 @@ asyncio interaction, not an application bug.
 None.
 
 ## Architectural decisions made during implementation
-See `DECISIONS.md` for the full list (D-001 through D-052). Notable ones affecting
+See `DECISIONS.md` for the full list (D-001 through D-053). Notable ones affecting
 what's built so far:
 - D-003/D-004: SQLAlchemy async + plain SQL migrations, schema grows incrementally
   per subsystem milestone rather than all at once.
@@ -485,9 +505,8 @@ what's built so far:
 - D-014: license selection is deferred to the project owner (placeholder in place).
 
 ## What is NOT yet built
-the rest of creative compute (provenance), the rest of
-analytics/benchmarks (host telemetry, analytics API, benchmark engine),
-the Node daemon, the rest of the WebUI
+the rest of analytics/benchmarks (host telemetry, analytics API, benchmark
+engine), the Node daemon, the rest of the WebUI
 (graph/compute/models/creative/assets/analytics/approvals views, full
 three-panel IA, context meter, accessibility audit), TUI feature
 completion, demo mode content, screenshot automation, GitHub Pages site,
@@ -521,7 +540,7 @@ HARNESS_DEMO_MODE=1 uv run harness serve
 
 Test suites:
 ```bash
-uv run pytest tests -q                      # backend: 423 tests
+uv run pytest tests -q                      # backend: 426 tests
 cd web && npm run test                      # web unit: vitest
 cd web && npx playwright test               # web e2e (needs both servers running)
 ```

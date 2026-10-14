@@ -146,6 +146,7 @@ async def run_batch_comparison(
                 params=params,
                 session_id=session_id,
                 workspace_id=workspace_id,
+                profile_id=cell.profile_id,
             )
             cell_result = {
                 "profile_id": cell.profile_id,

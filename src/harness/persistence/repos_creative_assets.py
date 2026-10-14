@@ -78,6 +78,19 @@ class CreativeAssetRepo:
             raise NotFoundError(f"creative asset not found: {asset_id}")
         return _asset(row)
 
+    async def find_by_filename(self, filename: str) -> list[CreativeAsset]:
+        """CRE-009: provenance's checkpoint-hash lookup. Returns every
+        cataloged asset recorded under this exact filename -- more than
+        one is a real possibility (different files sharing a name), which
+        is for the caller to treat as ambiguous, not for this method to
+        resolve.
+        """
+        rows = await self._db.fetch_all(
+            "SELECT * FROM creative_assets WHERE canonical_filename = :filename ORDER BY id",
+            {"filename": filename},
+        )
+        return [_asset(r) for r in rows]
+
     async def list_locations(self, asset_id: str) -> list[CreativeAssetLocation]:
         rows = await self._db.fetch_all(
             "SELECT * FROM creative_asset_locations WHERE asset_id = :asset_id "

@@ -402,7 +402,7 @@ Task format: ID — title / description / deps / components / acceptance / tests
 - Desc: full provenance record per generation (engine/version/host/workflow/checkpoint+hash/loras/prompt/seed/sampler/dims/steps/CFG/duration/resources/timestamp) on artifacts.
 - Deps: CRE-003, ART-001. Components: providers.creative, artifacts.
 - Acceptance: DoD "Output becomes Artifact with provenance".
-- Tests: provenance assertion tests. Status: TODO
+- Tests: provenance assertion tests. Status: DONE
 
 ---
 

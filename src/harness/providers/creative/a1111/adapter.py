@@ -8,6 +8,11 @@ simulating a push mechanism the protocol doesn't have. Canceling the
 Harness Job (JOB-001's cooperative `asyncio.Task.cancel()`) also calls the
 engine's own `/sdapi/v1/interrupt` before re-raising, so stopping the job
 actually stops the remote generation too, not just Harness's wait on it.
+
+Every output Artifact also carries a full CRE-009 provenance record
+(`harness.providers.creative.provenance`) built from this request's own
+`params`/the server's response -- see that module's docstring for the
+AUTOMATIC1111-vs-ComfyUI scope boundary.
 """
 
 from __future__ import annotations
@@ -15,6 +20,8 @@ from __future__ import annotations
 import asyncio
 import base64
 import contextlib
+import json
+import time
 from typing import Any, Literal
 
 from harness.artifacts.service import store_and_record_artifact
@@ -23,6 +30,13 @@ from harness.core.errors import UnsupportedCapabilityError
 from harness.events.model import Event, EventResource
 from harness.jobs.manager import JobHandle
 from harness.providers.creative.a1111.client import A1111Client
+from harness.providers.creative.provenance import (
+    GenerationProvenance,
+    extract_loras_from_prompt,
+    now_iso,
+    resolve_checkpoint_hash,
+    strip_lora_tags,
+)
 
 _POLL_INTERVAL_SECONDS = 0.5
 
@@ -57,6 +71,7 @@ async def run_a1111_generation(
     params: dict[str, Any],
     session_id: str | None,
     workspace_id: str | None,
+    profile_id: str | None = None,
 ) -> dict[str, Any]:
     client = A1111Client(base_url)
     try:
@@ -71,6 +86,7 @@ async def run_a1111_generation(
         if "progress" in capabilities:
             poll_task = asyncio.create_task(_poll_progress(app, client, handle, resource))
 
+        generation_started = time.monotonic()
         try:
             call = client.txt2img if operation == "txt2img" else client.img2img
             try:
@@ -85,6 +101,7 @@ async def run_a1111_generation(
                 poll_task.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
                     await poll_task
+        duration_ms = (time.monotonic() - generation_started) * 1000
 
         await app.publish(
             Event(
@@ -93,6 +110,16 @@ async def run_a1111_generation(
                 context={"job_id": handle.job_id},
                 payload={"operation": operation, "image_count": len(result.get("images", []))},
             )
+        )
+
+        provenance = await _build_provenance(
+            app,
+            engine_id=engine_id,
+            base_url=base_url,
+            params=params,
+            result=result,
+            duration_ms=duration_ms,
+            profile_id=profile_id,
         )
 
         output_artifact_ids: list[str] = []
@@ -111,6 +138,7 @@ async def run_a1111_generation(
                     "base_url": base_url,
                     "operation": operation,
                     "info": result.get("info", ""),
+                    **provenance.to_metadata(),
                 },
             )
             output_artifact_ids.append(artifact.id)
@@ -118,3 +146,53 @@ async def run_a1111_generation(
         return {"operation": operation, "output_artifact_ids": output_artifact_ids}
     finally:
         await client.aclose()
+
+
+async def _build_provenance(
+    app: Application,
+    *,
+    engine_id: str,
+    base_url: str,
+    params: dict[str, Any],
+    result: dict[str, Any],
+    duration_ms: float,
+    profile_id: str | None,
+) -> GenerationProvenance:
+    """CRE-009: every field here comes from a flat, source-verified A1111
+    request/response field (`params`, built by `a1111.profiles.
+    merge_profile_params`, or `result`'s ``info`` string) -- nothing is
+    inferred beyond what the request actually carried or the server
+    actually reported.
+    """
+    override_settings = params.get("override_settings") or {}
+    checkpoint = override_settings.get("sd_model_checkpoint")
+    raw_prompt = params.get("prompt", "")
+
+    seed = params.get("seed")
+    try:
+        reported_seed = json.loads(result.get("info", "{}")).get("seed")
+    except (TypeError, ValueError):
+        reported_seed = None
+    if reported_seed is not None:
+        seed = reported_seed  # the authoritative value when the request's own seed was -1/random
+
+    return GenerationProvenance(
+        engine_id=engine_id,
+        host=base_url,
+        timestamp=now_iso(),
+        duration_ms=duration_ms,
+        profile_id=profile_id,
+        checkpoint=checkpoint,
+        checkpoint_hash=await resolve_checkpoint_hash(app, checkpoint),
+        vae=override_settings.get("sd_vae"),
+        loras=extract_loras_from_prompt(raw_prompt),
+        prompt=strip_lora_tags(raw_prompt),
+        negative_prompt=params.get("negative_prompt"),
+        seed=seed,
+        sampler=params.get("sampler_name"),
+        scheduler=params.get("scheduler"),
+        width=params.get("width"),
+        height=params.get("height"),
+        steps=params.get("steps"),
+        cfg_scale=params.get("cfg_scale"),
+    )
