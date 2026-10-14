@@ -4,11 +4,11 @@ _Last updated: 2026-08-07_
 
 ## Current milestone
 Milestones 1-6 are all fully done (kernel, control plane, language compute,
-execution, agent runtime, MCP + Skills). Milestone 7 (Creative compute) is in
-progress: CRE-001 through CRE-007 are all done — see the notes below.
-CRE-008 (Batch comparison) depends on ANA-001 (Milestone 8), so ANA-001 was
-done out of sequence to unblock it; ANA-001 is also fully done — see its
-note below. Next up is CRE-008.
+execution, agent runtime, MCP + Skills). Milestone 7 (Creative compute) is
+in progress: CRE-001 through CRE-008 are all done — see the notes below.
+ANA-001 (Milestone 8) was done out of sequence since CRE-008 depends on
+it; ANA-001 is also fully done — see its note below. Next up is CRE-009
+(Provenance).
 
 CRE-001: `harness.providers.creative.families`/`discovery` parses Stability
 Matrix's `<DataDir>/settings.json` (verified via source inspection — its
@@ -171,6 +171,29 @@ testing this: canceling a task mid-DB-call can invalidate SQLite's single
 pooled connection, surfacing as "no such table" on the next query — D-030's
 lock serializes concurrent callers but doesn't protect a task's own
 in-flight call from its own cancellation. See D-051.
+
+CRE-008: `harness.providers.creative.batch.run_batch_comparison` (`POST
+/creative/batch`) runs one prompt across N cells (each a `CreativeProfile`
+or a raw checkpoint — exactly one of the two per cell) for the
+AUTOMATIC1111-compatible family only; ComfyUI is explicitly rejected
+rather than silently degraded, since comparing checkpoints through it
+would need a per-workflow node-layout assumption nothing here has
+verified. A single top-level seed applies to every cell unless overridden,
+making it a real A/B comparison. Runs as one Job; sequential or parallel
+scheduling; capacity-aware placement picks whichever candidate `base_url`
+currently has the fewest cells from this batch in flight (a real,
+in-batch least-loaded decision — not cluster-wide GPU/VRAM telemetry,
+which doesn't exist yet). One cell's failure doesn't abort the rest;
+`asyncio.CancelledError` (a `BaseException`, handled distinctly from
+per-cell `Exception`s) still leaves every cell with a correctly-recorded
+result. The result is a JSON manifest Artifact (not a composited pixel
+grid — no image-processing dependency this project doesn't otherwise
+need) plus each cell's own output Artifact(s). CRE-007's profile-merge
+helper was promoted to a shared, reusable function
+(`a1111.profiles.merge_profile_params`) rather than duplicated. Proven
+against two real local fixture A1111 servers: parallel scheduling splits
+4 cells 2-and-2 across two idle candidates; canceling the batch Job stops
+in-flight generations. See D-052.
 
 SKL-002: `harness.skills.superpowers.BUNDLES` declares the seven seed
 bundles (Coding, Git/GitHub, Browser, Creative, Research, Remote Host,
@@ -388,8 +411,8 @@ from persisted Runs/ToolRuns on every request rather than a separately
 maintained structure, so it can't drift from what actually happened.
 
 ## Active task
-CRE-001 through CRE-007 and ANA-001 are all done (see Current milestone
-above). Next per `TASKS.md` is CRE-008 (Batch comparison).
+CRE-001 through CRE-008 and ANA-001 are all done (see Current milestone
+above). Next per `TASKS.md` is CRE-009 (Provenance).
 
 ## Completed milestones
 - Phase 1: full spec-kit reading pass (all `SPEC/`, `ADR/`, `BUILD/`, `TESTING/`,
@@ -447,7 +470,7 @@ asyncio interaction, not an application bug.
 None.
 
 ## Architectural decisions made during implementation
-See `DECISIONS.md` for the full list (D-001 through D-051). Notable ones affecting
+See `DECISIONS.md` for the full list (D-001 through D-052). Notable ones affecting
 what's built so far:
 - D-003/D-004: SQLAlchemy async + plain SQL migrations, schema grows incrementally
   per subsystem milestone rather than all at once.
@@ -462,8 +485,9 @@ what's built so far:
 - D-014: license selection is deferred to the project owner (placeholder in place).
 
 ## What is NOT yet built
-the rest of creative compute (batch comparison, provenance),
-analytics/benchmarks, the Node daemon, the rest of the WebUI
+the rest of creative compute (provenance), the rest of
+analytics/benchmarks (host telemetry, analytics API, benchmark engine),
+the Node daemon, the rest of the WebUI
 (graph/compute/models/creative/assets/analytics/approvals views, full
 three-panel IA, context meter, accessibility audit), TUI feature
 completion, demo mode content, screenshot automation, GitHub Pages site,
@@ -497,7 +521,7 @@ HARNESS_DEMO_MODE=1 uv run harness serve
 
 Test suites:
 ```bash
-uv run pytest tests -q                      # backend: 416 tests
+uv run pytest tests -q                      # backend: 423 tests
 cd web && npm run test                      # web unit: vitest
 cd web && npx playwright test               # web e2e (needs both servers running)
 ```

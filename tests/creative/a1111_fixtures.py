@@ -40,6 +40,7 @@ def create_fake_a1111_app(
         "progress_calls": 0,
         "interrupted": False,
         "last_txt2img_body": None,
+        "txt2img_bodies": [],
     }
 
     if "options" not in omit_endpoints:
@@ -110,6 +111,7 @@ def create_fake_a1111_app(
         async def txt2img(request: Request) -> dict[str, Any]:
             body = await request.json()
             state["last_txt2img_body"] = body
+            state["txt2img_bodies"].append(body)
             await asyncio.sleep(generation_delay_seconds)
             return {
                 "images": [FAKE_IMAGE_B64],

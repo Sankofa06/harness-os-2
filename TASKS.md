@@ -396,7 +396,7 @@ Task format: ID — title / description / deps / components / acceptance / tests
 - Desc: one prompt × N checkpoints/profiles, controlled seeds, sequential/parallel, capacity-aware placement, grid artifact, run metrics.
 - Deps: CRE-007, ANA-001. Components: providers.creative, jobs.
 - Acceptance: DoD batch comparison with deterministic fixture.
-- Tests: fixture batch test. Status: TODO
+- Tests: fixture batch test. Status: DONE
 
 ### CRE-009 Provenance
 - Desc: full provenance record per generation (engine/version/host/workflow/checkpoint+hash/loras/prompt/seed/sampler/dims/steps/CFG/duration/resources/timestamp) on artifacts.

@@ -1206,3 +1206,71 @@ Format: decision / reason / alternatives / consequences.
   will have its own long-lived cancelable loops hitting the same DB)
   should treat this as a known, reproducible gap, not rediscover it from
   scratch.
+
+## D-052 — Batch comparison: AUTOMATIC1111-compatible family only; placement is real but scoped to in-batch load, not cluster-wide telemetry
+- Decision: CRE-008's batch comparison (`harness.providers.creative.batch.
+  run_batch_comparison`, `POST /creative/batch`) runs one prompt across N
+  cells (each a `CreativeProfile` or a raw checkpoint name — exactly one
+  of the two, enforced at request validation, since a cell naming both
+  would leave a silent, undocumented precedence question) for the
+  AUTOMATIC1111-compatible family only. ComfyUI is explicitly rejected
+  (422) rather than silently degraded, because comparing N checkpoints
+  through ComfyUI would mean mutating a workflow graph's checkpoint-
+  loader node per cell, and Harness has not verified any real workflow's
+  node layout for that — CRE-007 could lean on A1111's `override_settings`
+  only because that mechanism was independently source-verified; no
+  equivalent verification exists for an arbitrary ComfyUI workflow.
+  - **Controlled seed**: a single top-level `seed` applies to every cell
+    unless a cell overrides it — the thing being varied across cells is
+    the checkpoint/profile, not the seed, which is what makes it a real
+    A/B comparison rather than N unrelated generations.
+  - **Capacity-aware placement is real but intentionally scoped**: there
+    is no cluster-wide GPU/VRAM telemetry for an arbitrary engine
+    `base_url` yet (that's ANA-002/NODE-001's job), so "capacity-aware"
+    here means picking whichever candidate `base_url` currently has the
+    fewest cells *from this batch* in flight (`_LoadTracker`, a plain
+    dict counter — safe without a lock since nothing awaits between a
+    pick and its matching start/finish). This is a real, tested least-
+    loaded decision (parallel scheduling with 2 idle candidates splits 4
+    cells 2-and-2, proven against two real fixture servers), not an
+    overclaimed cluster-wide scheduler.
+  - **One cell's failure doesn't abort the batch** — each cell's
+    exception is caught and recorded (`status: "failed"`, `error`), and
+    the batch continues; useful since a mistyped checkpoint name on one
+    cell shouldn't invalidate an otherwise-successful comparison.
+    `asyncio.CancelledError` is handled separately (it's a
+    `BaseException`, not an `Exception` — it would otherwise skip the
+    per-cell `except` and leave the `finally` block referencing an
+    unbound result): each cell starts with a `"canceled"` placeholder
+    result before its own work begins, so canceling the whole batch Job
+    (which propagates into whichever cells are in flight the same way
+    `run_a1111_generation` already handles cancellation) leaves every
+    still-pending/in-flight cell correctly recorded rather than crashing
+    on an unbound variable.
+  - **"Grid/result artifact"**: a JSON manifest (one `document` Artifact
+    per batch — engine/prompt/seed/scheduling/every cell's checkpoint/
+    seed/base_url/status/output_artifact_ids/queue_time_ms/duration_ms),
+    not a composited pixel grid image. Composing a visual grid would add
+    an image-processing dependency (Pillow) this project doesn't
+    otherwise need, for a presentational nicety the WebUI can build
+    client-side from the manifest + individual output artifacts just as
+    well; SPEC's "grid/result artifact" phrasing (the slash) reads as
+    accepting either, and the manifest is the honest, dependency-light
+    choice.
+  - `_merge_a1111_profile_params` (CRE-007) was promoted from a private
+    route-module helper to `harness.providers.creative.a1111.profiles.
+    merge_profile_params`, taking plain checkpoint/vae/sampler/scheduler/
+    loras arguments instead of a full `CreativeProfile`, so both the
+    single-generation route and the batch module can call it — including
+    for a batch cell with a raw `checkpoint` and no saved profile at all.
+- Reason: SPEC's batch comparison bullet names exactly these mechanics
+  (controlled seeds, sequential/parallel scheduling, capacity-aware
+  placement, grid/result artifact, run metrics); scoping to the one
+  family with a verified override mechanism keeps every claim honest.
+- Consequences: comparing checkpoints through ComfyUI, and progress
+  reporting that's cleanly per-cell rather than a single number shared
+  across concurrently-running cells (parallel cells currently share one
+  Job's `handle.set_progress`, so a cell's own 0-1 generation-progress
+  polling and the batch's cells-completed-fraction updates can briefly
+  interleave) are both left as known, undisguised limits rather than
+  quietly worked around.

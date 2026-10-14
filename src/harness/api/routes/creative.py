@@ -42,10 +42,18 @@ with multiple locations.
 preset, explicitly not a Persona. Passing ``profile_id`` on `POST
 /creative/jobs` drives that generation from it: for ComfyUI, the profile's
 ``workflow_artifact_id`` is used when the request itself doesn't specify a
-workflow; for the AUTOMATIC1111-compatible family, `_merge_a1111_profile_
-params` applies the profile's checkpoint/VAE/sampler/scheduler/LoRAs as
-real txt2img/img2img request fields (verified from A1111 source, not
-guessed), with any field the request sets explicitly taking precedence.
+workflow; for the AUTOMATIC1111-compatible family,
+`harness.providers.creative.a1111.profiles.merge_profile_params` applies
+the profile's checkpoint/VAE/sampler/scheduler/LoRAs as real txt2img/
+img2img request fields (verified from A1111 source, not guessed), with
+any field the request sets explicitly taking precedence.
+
+`POST /creative/batch` (CRE-008) runs one prompt across N checkpoints/
+profiles for the AUTOMATIC1111-compatible family -- the only family whose
+checkpoint-override mechanism is verified from source; ComfyUI's per-node
+checkpoint-widget mutation would require guessing a workflow's node
+layout, a real declared scope limit, not a placeholder. See
+`harness.providers.creative.batch`.
 """
 
 from __future__ import annotations
@@ -67,7 +75,9 @@ from harness.hosts.resolve import build_ssh_host
 from harness.jobs.manager import JobHandle
 from harness.jobs.model import Job
 from harness.providers.creative.a1111.adapter import run_a1111_generation
+from harness.providers.creative.a1111.profiles import merge_profile_params
 from harness.providers.creative.assets import scan_models_directory
+from harness.providers.creative.batch import BatchCellSpec, run_batch_comparison
 from harness.providers.creative.comfyui.adapter import run_comfyui_generation
 from harness.providers.creative.discovery import parse_installed_packages
 from harness.providers.creative.families import FAMILIES, FAMILIES_BY_ID
@@ -260,44 +270,6 @@ class CreativeJobRequest(BaseModel):
     workspace_id: str | None = None
 
 
-def _merge_a1111_profile_params(profile: CreativeProfile, params: dict[str, Any]) -> dict[str, Any]:
-    """Applies a Checkpoint Profile bundle (checkpoint/vae/sampler/
-    scheduler/loras) as real AUTOMATIC1111 txt2img/img2img request fields,
-    verified directly from `modules/processing.py`/`extra_networks_lora.py`
-    source: checkpoint/VAE go in `override_settings` (A1111 itself restores
-    the prior values after the request), sampler/scheduler are top-level
-    fields, and LoRAs have no structured field at all in this API -- they
-    are applied by appending `<lora:name:1.0>` tokens to the prompt string,
-    the built-in Lora extension's only mechanism. Explicit request
-    ``params`` always win over the profile's own defaults.
-    """
-    override_settings: dict[str, Any] = {}
-    if profile.checkpoint is not None:
-        override_settings["sd_model_checkpoint"] = profile.checkpoint
-    if profile.vae is not None:
-        override_settings["sd_vae"] = profile.vae
-
-    merged: dict[str, Any] = {}
-    if override_settings:
-        merged["override_settings"] = override_settings
-    if profile.sampler is not None:
-        merged["sampler_name"] = profile.sampler
-    if profile.scheduler is not None:
-        merged["scheduler"] = profile.scheduler
-
-    for key, value in params.items():
-        if key == "override_settings" and isinstance(value, dict) and merged.get(key):
-            merged[key] = {**merged[key], **value}
-        else:
-            merged[key] = value
-
-    if profile.loras:
-        lora_tags = "".join(f"<lora:{name}:1.0>" for name in profile.loras)
-        merged["prompt"] = merged.get("prompt", "") + lora_tags
-
-    return merged
-
-
 @router.post("/creative/jobs", status_code=202)
 async def submit_creative_job(request: Request, body: CreativeJobRequest) -> Job:
     """Only engines with a real adapter are accepted — the `Literal` type
@@ -349,7 +321,16 @@ async def submit_creative_job(request: Request, body: CreativeJobRequest) -> Job
     engine_id = body.engine_id
     operation = body.operation
     params = (
-        _merge_a1111_profile_params(profile, body.params or {}) if profile else (body.params or {})
+        merge_profile_params(
+            body.params or {},
+            checkpoint=profile.checkpoint,
+            vae=profile.vae,
+            sampler=profile.sampler,
+            scheduler=profile.scheduler,
+            loras=profile.loras,
+        )
+        if profile
+        else (body.params or {})
     )
 
     async def a1111_work(handle: JobHandle) -> dict[str, Any]:
@@ -371,6 +352,69 @@ async def submit_creative_job(request: Request, body: CreativeJobRequest) -> Job
 async def list_creative_jobs(request: Request) -> list[Job]:
     jobs = await _app(request).jobs.list()
     return [j for j in jobs if j.type.startswith("creative.")]
+
+
+class BatchCellRequest(BaseModel):
+    profile_id: str | None = None
+    checkpoint: str | None = None
+    seed: int | None = None
+
+
+class CreativeBatchRequest(BaseModel):
+    engine_id: str
+    base_urls: list[str]
+    operation: Literal["txt2img", "img2img"] = "txt2img"
+    prompt: str
+    seed: int
+    params: dict[str, Any] = Field(default_factory=dict)
+    cells: list[BatchCellRequest]
+    scheduling: Literal["sequential", "parallel"] = "sequential"
+    session_id: str | None = None
+    workspace_id: str | None = None
+
+
+@router.post("/creative/batch", status_code=202)
+async def submit_creative_batch(request: Request, body: CreativeBatchRequest) -> Job:
+    """CRE-008: one prompt across N checkpoints/profiles with a controlled
+    seed, sequential or parallel scheduling, and capacity-aware placement
+    across one or more candidate engine instances (`base_urls`) -- the
+    AUTOMATIC1111-compatible family only (see module docstring for why).
+    """
+    if body.engine_id not in _A1111_COMPATIBLE_ENGINE_IDS:
+        raise ValidationFailedError(
+            f"batch comparison is only supported for the AUTOMATIC1111-compatible "
+            f"family today, not {body.engine_id!r}"
+        )
+    for cell in body.cells:
+        if (cell.profile_id is None) == (cell.checkpoint is None):
+            raise ValidationFailedError(
+                "each batch cell must specify exactly one of profile_id or checkpoint"
+            )
+
+    app = _app(request)
+    engine_id = body.engine_id
+    cells = [
+        BatchCellSpec(profile_id=c.profile_id, checkpoint=c.checkpoint, seed=c.seed)
+        for c in body.cells
+    ]
+
+    async def batch_work(handle: JobHandle) -> dict[str, Any]:
+        return await run_batch_comparison(
+            app,
+            handle,
+            engine_id=engine_id,
+            base_urls=body.base_urls,
+            operation=body.operation,
+            prompt=body.prompt,
+            seed=body.seed,
+            shared_params=body.params,
+            cells=cells,
+            scheduling=body.scheduling,
+            session_id=body.session_id,
+            workspace_id=body.workspace_id,
+        )
+
+    return await app.job_manager.submit("creative.a1111.batch", batch_work)
 
 
 class HealthCheckRequest(BaseModel):
