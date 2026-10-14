@@ -189,6 +189,34 @@ class SSHHost:
         finally:
             conn.close()
 
+    async def sha256_file(self, path: str) -> str:
+        """Compute the file's SHA-256 remotely via ``sha256sum``, without
+        transferring its bytes to this process -- essential for cataloging
+        multi-gigabyte model checkpoints (CRE-006) where downloading the
+        whole file just to hash it would be wasteful. Still gets the same
+        symlink-aware remote-resolved containment check every other file
+        operation here gets, before the command referencing it is built.
+        """
+        canonicalize_and_check(path, self._workspace_roots)
+        conn = await self._connect()
+        try:
+            async with conn.start_sftp_client() as sftp:
+                await resolve_and_check(sftp, path, self._workspace_roots)
+            command = shlex.join(["sha256sum", path])
+            async with conn.create_process(command) as process:
+                stdout = await process.stdout.read()
+                await process.wait()
+                if process.exit_status != 0:
+                    raise ProviderError(
+                        f"sha256sum failed for {path}: exit status {process.exit_status}"
+                    )
+            digest: str = stdout.split()[0]
+            return digest
+        except (OSError, asyncssh.Error) as exc:
+            raise ProviderError(f"sha256 computation failed for {path}: {exc}") from exc
+        finally:
+            conn.close()
+
     async def mkdir(self, path: str) -> None:
         canonicalize_and_check(path, self._workspace_roots)
         conn = await self._connect()

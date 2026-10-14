@@ -384,7 +384,7 @@ Task format: ID — title / description / deps / components / acceptance / tests
 - Desc: canonical asset types, hash/path dedupe across engines, creative_assets table.
 - Deps: CRE-001, ART-001. Components: providers.creative.
 - Acceptance: shared checkpoint appears once with multiple locations.
-- Tests: dedupe unit tests. Status: TODO
+- Tests: dedupe unit tests. Status: DONE
 
 ### CRE-007 Creative profiles
 - Desc: creative_profiles per SPEC (selector/settings/placement; checkpoint-profile bundles); not personas.

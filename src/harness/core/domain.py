@@ -465,6 +465,34 @@ class CreativeInstallation(BaseModel):
     created_at: str = ""
 
 
+class CreativeAsset(BaseModel):
+    """One deduplicated-by-content-hash model file (CRE-006,
+    SPEC/CREATIVE_COMPUTE.md "Creative assets"). Identity is `content_hash`
+    (SHA-256, computed remotely on the scanned host, not transferred) --
+    the same checkpoint found at several paths/hosts is one `CreativeAsset`
+    with several `CreativeAssetLocation` rows, not one row per path.
+    """
+
+    id: str
+    asset_kind: str
+    content_hash: str
+    size_bytes: int = 0
+    canonical_filename: str
+    created_at: str = ""
+
+
+class CreativeAssetLocation(BaseModel):
+    """One place a `CreativeAsset`'s content was found: a (host, path) pair
+    from a scan (CRE-006).
+    """
+
+    id: str
+    asset_id: str
+    host_id: str
+    path: str
+    discovered_at: str = ""
+
+
 class RunMetrics(BaseModel):
     run_id: str
     input_tokens: int | None = None

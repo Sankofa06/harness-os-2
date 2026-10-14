@@ -1,6 +1,6 @@
 """Stability Matrix installation discovery + engine capability model +
-ComfyUI/A1111/launch_fs generation endpoints
-(CRE-001/CRE-002/CRE-003/CRE-004/CRE-005, SPEC/CREATIVE_COMPUTE.md,
+ComfyUI/A1111/launch_fs generation endpoints + creative asset catalog
+(CRE-001/CRE-002/CRE-003/CRE-004/CRE-005/CRE-006, SPEC/CREATIVE_COMPUTE.md,
 SPEC/API_CONTRACT.md).
 
 Discovery reads `<data_dir>/settings.json` from a registered SSH Host via
@@ -31,6 +31,12 @@ detection, respectively; `creative.launch_engine`/`creative.launch_training`
 (registered as native Tools, not REST routes here — see
 `harness.providers.creative.launch_fs`) launch an already-discovered
 installation's own recorded command over SSH.
+
+`POST /creative/assets/scan` walks a host's shared Stability Matrix
+``Models`` directory (CRE-006, `harness.providers.creative.assets`),
+hashing each recognized model file remotely and deduping by content hash
+so the same checkpoint found at multiple paths/hosts is cataloged once
+with multiple locations.
 """
 
 from __future__ import annotations
@@ -39,18 +45,19 @@ import json
 from typing import Any, Literal, cast
 
 from fastapi import APIRouter, Depends, Query, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from harness.api.auth import require_auth
 from harness.artifacts.service import store_and_record_artifact
 from harness.core.app import Application
-from harness.core.domain import Artifact, CreativeInstallation
+from harness.core.domain import Artifact, CreativeAsset, CreativeInstallation
 from harness.core.errors import NotFoundError, ValidationFailedError
 from harness.core.settings_schema import SettingsSchema
 from harness.hosts.resolve import build_ssh_host
 from harness.jobs.manager import JobHandle
 from harness.jobs.model import Job
 from harness.providers.creative.a1111.adapter import run_a1111_generation
+from harness.providers.creative.assets import scan_models_directory
 from harness.providers.creative.comfyui.adapter import run_comfyui_generation
 from harness.providers.creative.discovery import parse_installed_packages
 from harness.providers.creative.families import FAMILIES, FAMILIES_BY_ID
@@ -333,3 +340,52 @@ async def invokeai_detect(request: Request, body: InvokeAIDetectRequest) -> Invo
     """
     version = await detect_invokeai(body.base_url)
     return InvokeAIDetectResult(detected=version is not None, version=version)
+
+
+class AssetLocationInfo(BaseModel):
+    host_id: str
+    path: str
+
+
+class CreativeAssetWithLocations(CreativeAsset):
+    locations: list[AssetLocationInfo] = Field(default_factory=list)
+
+
+class AssetScanRequest(BaseModel):
+    host_id: str
+    models_root: str
+
+
+@router.post("/creative/assets/scan")
+async def scan_assets(request: Request, body: AssetScanRequest) -> list[CreativeAssetWithLocations]:
+    """Scan ``models_root`` (the host's Stability Matrix shared ``Models``
+    directory — not derived automatically from a `data_dir`, since Harness
+    does not read Stability Matrix's own ``ModelDirectoryOverride`` setting;
+    callers supply the real path rather than Harness guessing the
+    un-overridden default) and record every recognized model file found
+    (CRE-006).
+    """
+    app = _app(request)
+    host = await app.hosts.get(body.host_id)  # 404s if unknown
+    ssh_host = await build_ssh_host(host, app.secret_refs, app.secret_store)
+    scanned = await scan_models_directory(ssh_host, body.models_root)
+    assets = await app.creative_assets.record_scan(body.host_id, scanned)
+    return [await _asset_with_locations(app, asset.id) for asset in assets]
+
+
+@router.get("/creative/assets")
+async def list_assets(
+    request: Request, asset_kind: str | None = Query(default=None)
+) -> list[CreativeAssetWithLocations]:
+    app = _app(request)
+    assets = await app.creative_assets.list(asset_kind=asset_kind)
+    return [await _asset_with_locations(app, asset.id) for asset in assets]
+
+
+async def _asset_with_locations(app: Application, asset_id: str) -> CreativeAssetWithLocations:
+    asset = await app.creative_assets.get(asset_id)
+    locations = await app.creative_assets.list_locations(asset_id)
+    return CreativeAssetWithLocations(
+        **asset.model_dump(),
+        locations=[AssetLocationInfo(host_id=loc.host_id, path=loc.path) for loc in locations],
+    )

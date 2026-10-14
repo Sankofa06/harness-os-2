@@ -5,8 +5,8 @@ _Last updated: 2026-08-07_
 ## Current milestone
 Milestones 1-6 are all fully done (kernel, control plane, language compute,
 execution, agent runtime, MCP + Skills). Milestone 7 (Creative compute) is in
-progress: CRE-001 through CRE-005 are all done — see the notes below. Next
-up is CRE-006 (Creative assets catalog).
+progress: CRE-001 through CRE-006 are all done — see the notes below. Next
+up is CRE-007 (Creative profiles).
 
 CRE-001: `harness.providers.creative.families`/`discovery` parses Stability
 Matrix's `<DataDir>/settings.json` (verified via source inspection — its
@@ -108,6 +108,29 @@ tier was also corrected down from an unverified `http_adapter` overclaim
 (CRE-002) to the honest `launch_fs`. Proven against real local fixture
 servers and a real local SSH server, including that canceling a launch Job
 actually stops the remote `sleep`. See D-048.
+
+CRE-006: `harness.providers.creative.assets` catalogs model files under
+Stability Matrix's shared `<DataDir>/Models/<SharedFolderType>` tree — the
+one place a checkpoint shared across multiple engine installs is actually
+shared, not copied — rather than each package's own per-install folder.
+The shared-folder names, `Models` root location, and recognized file
+extensions are all verified directly from LykosAI/StabilityMatrix source
+(`SharedFolderType.cs`, `SettingsManager.cs`, `LocalModelFile.cs`), mapping
+nine of the thirteen SPEC canonical asset kinds to a real folder
+(checkpoint/diffusion_model/lora/vae/embedding/controlnet/upscaler/
+text_encoder/clip); the other four (workflow/training_output/image/video)
+are already Artifacts elsewhere and have no Models-folder source. Each
+recognized file is hashed on the remote host itself (`SSHHost.sha256_file`,
+a `sha256sum` run over the existing argv-quoted SSH-exec path — never
+downloading multi-gigabyte checkpoints to hash them locally), after the
+same symlink-aware containment check every other file operation gets.
+`CreativeAssetRepo` dedupes by content hash into `creative_assets`, with
+every (host, path) found recorded as a `creative_asset_locations` row —
+`POST /creative/assets/scan` and `GET /creative/assets` prove a checkpoint
+at two paths (even across two different hosts) catalogs as one asset with
+multiple locations. `models_root` is caller-supplied rather than derived
+from `data_dir`, since Harness doesn't read Stability Matrix's own
+`ModelDirectoryOverride` setting. See D-049.
 
 SKL-002: `harness.skills.superpowers.BUNDLES` declares the seven seed
 bundles (Coding, Git/GitHub, Browser, Creative, Research, Remote Host,
@@ -325,8 +348,8 @@ from persisted Runs/ToolRuns on every request rather than a separately
 maintained structure, so it can't drift from what actually happened.
 
 ## Active task
-CRE-001 through CRE-005 are all done (see Current milestone above). Next per
-`TASKS.md` is CRE-006 (Creative assets catalog).
+CRE-001 through CRE-006 are all done (see Current milestone above). Next per
+`TASKS.md` is CRE-007 (Creative profiles).
 
 ## Completed milestones
 - Phase 1: full spec-kit reading pass (all `SPEC/`, `ADR/`, `BUILD/`, `TESTING/`,
@@ -384,7 +407,7 @@ asyncio interaction, not an application bug.
 None.
 
 ## Architectural decisions made during implementation
-See `DECISIONS.md` for the full list (D-001 through D-048). Notable ones affecting
+See `DECISIONS.md` for the full list (D-001 through D-049). Notable ones affecting
 what's built so far:
 - D-003/D-004: SQLAlchemy async + plain SQL migrations, schema grows incrementally
   per subsystem milestone rather than all at once.
@@ -399,8 +422,8 @@ what's built so far:
 - D-014: license selection is deferred to the project owner (placeholder in place).
 
 ## What is NOT yet built
-the rest of creative compute (asset catalog, profiles, batch comparison,
-provenance), analytics/benchmarks, the Node daemon, the rest of the WebUI
+the rest of creative compute (profiles, batch comparison, provenance),
+analytics/benchmarks, the Node daemon, the rest of the WebUI
 (graph/compute/models/creative/assets/analytics/approvals views, full
 three-panel IA, context meter, accessibility audit), TUI feature
 completion, demo mode content, screenshot automation, GitHub Pages site,
@@ -434,7 +457,7 @@ HARNESS_DEMO_MODE=1 uv run harness serve
 
 Test suites:
 ```bash
-uv run pytest tests -q                      # backend: 387 tests
+uv run pytest tests -q                      # backend: 407 tests
 cd web && npm run test                      # web unit: vitest
 cd web && npx playwright test               # web e2e (needs both servers running)
 ```

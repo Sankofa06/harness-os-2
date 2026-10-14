@@ -31,6 +31,7 @@ PREFIXES: frozenset[str] = frozenset(
         "art",
         "cre",
         "asset",
+        "astloc",
         "prof",
         "bench",
         "evt",

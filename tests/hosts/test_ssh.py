@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 
 import pytest
 
@@ -152,6 +153,56 @@ async def test_sftp_write_read_list_move_delete_round_trip(
     await ssh_host.delete(moved_path)
     entries_after = await ssh_host.list_dir(base)
     assert not any(e.name == "renamed.txt" for e in entries_after)
+
+
+@pytest.mark.asyncio
+async def test_sha256_file_matches_local_hash_without_reading_whole_file_into_memory(
+    ssh_server: RunningSSHServer, tmp_path
+) -> None:
+    ssh_host = _ssh_host(ssh_server, workspace_roots=[str(tmp_path)])
+    file_path = tmp_path / "model.safetensors"
+    file_path.write_bytes(b"pretend checkpoint bytes")
+    expected = hashlib.sha256(b"pretend checkpoint bytes").hexdigest()
+
+    assert await ssh_host.sha256_file(str(file_path)) == expected
+
+
+@pytest.mark.asyncio
+async def test_sha256_file_outside_workspace_roots_rejected(
+    ssh_server: RunningSSHServer, tmp_path
+) -> None:
+    (tmp_path / "allowed").mkdir()
+    outside = tmp_path / "other" / "model.safetensors"
+    outside.parent.mkdir()
+    outside.write_bytes(b"data")
+    ssh_host = _ssh_host(ssh_server, workspace_roots=[str(tmp_path / "allowed")])
+    with pytest.raises(PermissionDeniedError):
+        await ssh_host.sha256_file(str(outside))
+
+
+@pytest.mark.asyncio
+async def test_sha256_file_via_symlink_escaping_root_rejected(
+    ssh_server: RunningSSHServer, tmp_path
+) -> None:
+    allowed = tmp_path / "allowed"
+    allowed.mkdir()
+    secret = tmp_path / "secret.bin"
+    secret.write_bytes(b"top secret")
+    escape_link = allowed / "escape.safetensors"
+    escape_link.symlink_to(secret)
+
+    ssh_host = _ssh_host(ssh_server, workspace_roots=[str(allowed)])
+    with pytest.raises(PermissionDeniedError):
+        await ssh_host.sha256_file(str(escape_link))
+
+
+@pytest.mark.asyncio
+async def test_sha256_file_missing_file_raises_provider_error(
+    ssh_server: RunningSSHServer, tmp_path
+) -> None:
+    ssh_host = _ssh_host(ssh_server, workspace_roots=[str(tmp_path)])
+    with pytest.raises(ProviderError):
+        await ssh_host.sha256_file(str(tmp_path / "does-not-exist.safetensors"))
 
 
 @pytest.mark.asyncio

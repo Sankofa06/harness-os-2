@@ -1048,3 +1048,62 @@ Format: decision / reason / alternatives / consequences.
   built-in log-capture-to-Artifact or resource estimates yet (SPEC also
   mentions these for training); the output tail capped at 200 lines and
   streamed as events is the real, tested capability today.
+
+## D-049 — Creative asset catalog: scan the shared Models tree, hash remotely, dedupe by content hash
+- Decision: CRE-006 catalogs model files under Stability Matrix's shared
+  `<DataDir>/Models/<SharedFolderType>` tree rather than each package's
+  own per-install `models/...` copy, because that shared tree is exactly
+  what makes "a checkpoint shared across engines appears once" possible —
+  every installed package's own folder is a link/junction into it, not an
+  independent copy.
+  - **Folder taxonomy verified from source, not guessed**: the on-disk
+    subfolder names, the `Models` root location, and the recognized file
+    extensions are all taken directly from LykosAI/StabilityMatrix —
+    `StabilityMatrix.Core/Models/SharedFolderType.cs` (the enum; its
+    on-disk folder name is exactly its C# member name, confirmed via
+    `EnumAttributes.cs`'s `GetStringValue()` falling back to
+    `Enum.GetName` since this enum carries no `[StringValue]` override),
+    `SettingsManager.cs`'s `ModelsDirectory` (`Settings.
+    ModelDirectoryOverride ?? Path.Combine(LibraryDir, "Models")`), and
+    `LocalModelFile.cs`'s `SupportedCheckpointExtensions`. Nine of the
+    thirteen SPEC canonical asset kinds correspond to a shared-folder
+    group (checkpoint, diffusion_model, lora, vae, embedding, controlnet,
+    upscaler, text_encoder, clip); the other four (workflow,
+    training_output, image, video) are already represented elsewhere as
+    Artifacts (CRE-002's workflow storage, CRE-003/004's generation-output
+    capture) and have no Models-folder source to scan here — not a gap,
+    just the honest boundary of what this scanner's job is.
+  - **`models_root` is caller-supplied, not derived from `data_dir`**:
+    Harness does not read Stability Matrix's own `ModelDirectoryOverride`
+    setting, so silently assuming `<data_dir>/Models` is correct for every
+    host would be exactly the kind of guess-past-a-limitation AGENTS.md
+    rules out. The endpoint takes the real path directly instead.
+  - **Hashing happens on the remote host, never downloading the file**:
+    `SSHHost.sha256_file` runs `sha256sum <path>` via the same
+    argv-quoted-then-shell-joined exec path `exec_stream` already uses (no
+    string concatenation of untrusted input), after the same symlink-aware
+    SFTP-realpath containment check every other file operation here gets.
+    Transferring a multi-gigabyte checkpoint over SFTP just to hash it
+    locally would be wasteful and is never done.
+  - **Dedupe identity is `content_hash`**, unique in `creative_assets`;
+    every (host, path) a scan finds that hash at becomes a row in
+    `creative_asset_locations` (`UNIQUE(host_id, path)`, upserted on
+    rescan so a path whose content changed in place now points at the new
+    content's asset rather than stale data). `CreativeAssetRepo.list()`/
+    `list_locations()` order by `(canonical_filename, id)`/
+    `(discovered_at, id)` respectively — the `id`/secondary-column
+    tiebreaker follows the same fix already applied to `ToolRunRepo`,
+    `ArtifactRepo`, and `JobRepo` after SQLite's `datetime('now')`
+    1-second resolution caused flaky ordering for same-second inserts
+    elsewhere this project.
+- Reason: SPEC's "Deduplicate by content hash/path identity where
+  possible" is the actual acceptance bar, and the shared Models tree is
+  the one place in a Stability Matrix install where cross-engine sharing
+  is real rather than coincidental filename matching.
+- Consequences: engines with a live control API (ComfyUI/A1111-family)
+  still don't surface their own live checkpoint lists through this
+  catalog — CRE-006 only scans the filesystem; reconciling that against
+  what an adapter's `sd_models()`/`object_info` calls report is future
+  work, not assumed here. A package using `ModelDirectoryOverride` must
+  have its real `models_root` passed explicitly; Harness has no way to
+  detect the override itself today, and doesn't pretend to.

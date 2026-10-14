@@ -45,6 +45,7 @@ from harness.persistence.repos_capabilities import SessionCapabilityRepo
 from harness.persistence.repos_context import TranscriptStateRepo
 from harness.persistence.repos_control_plane import HostRepo, ModelProfileRepo, ProviderConfigRepo
 from harness.persistence.repos_creative import CreativeInstallationRepo
+from harness.persistence.repos_creative_assets import CreativeAssetRepo
 from harness.persistence.repos_jobs import JobRepo
 from harness.persistence.repos_mcp import McpIndexRepo, McpServerRepo
 from harness.persistence.repos_model_instances import ModelInstanceRepo
@@ -110,6 +111,7 @@ class Application:
     skill_activations: SkillActivationRepo
     superpowers: SuperpowerRepo
     creative_installations: CreativeInstallationRepo
+    creative_assets: CreativeAssetRepo
     compiler: ContextCompiler
     api_token: str
     system_binding: Binding = field(default_factory=lambda: SYSTEM_DEFAULT_BINDING)
@@ -214,6 +216,7 @@ async def create_application(config: HarnessConfig | None = None) -> Application
     skill_activations = SkillActivationRepo(db)
     superpowers = SuperpowerRepo(db)
     creative_installations = CreativeInstallationRepo(db)
+    creative_assets = CreativeAssetRepo(db)
     register_capabilities_search_tool(tools, mcp_index, skills, superpowers)
     register_tools_describe_tool(tools, tools, mcp_index, session_capabilities)
     register_skills_activate_tool(tools, skills, skill_activations)
@@ -259,6 +262,7 @@ async def create_application(config: HarnessConfig | None = None) -> Application
         skill_activations=skill_activations,
         superpowers=superpowers,
         creative_installations=creative_installations,
+        creative_assets=creative_assets,
         compiler=compiler,
         api_token=token,
     )
