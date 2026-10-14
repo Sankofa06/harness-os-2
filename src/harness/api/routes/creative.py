@@ -1,6 +1,6 @@
 """Stability Matrix installation discovery + engine capability model +
-ComfyUI/A1111/launch_fs generation endpoints + creative asset catalog
-(CRE-001/CRE-002/CRE-003/CRE-004/CRE-005/CRE-006, SPEC/CREATIVE_COMPUTE.md,
+ComfyUI/A1111/launch_fs generation endpoints + creative asset catalog +
+creative profiles (CRE-001 through CRE-007, SPEC/CREATIVE_COMPUTE.md,
 SPEC/API_CONTRACT.md).
 
 Discovery reads `<data_dir>/settings.json` from a registered SSH Host via
@@ -37,6 +37,15 @@ installation's own recorded command over SSH.
 hashing each recognized model file remotely and deduping by content hash
 so the same checkpoint found at multiple paths/hosts is cataloged once
 with multiple locations.
+
+`POST /creative/profiles` stores a Creative Profile (CRE-007) -- a reusable
+preset, explicitly not a Persona. Passing ``profile_id`` on `POST
+/creative/jobs` drives that generation from it: for ComfyUI, the profile's
+``workflow_artifact_id`` is used when the request itself doesn't specify a
+workflow; for the AUTOMATIC1111-compatible family, `_merge_a1111_profile_
+params` applies the profile's checkpoint/VAE/sampler/scheduler/LoRAs as
+real txt2img/img2img request fields (verified from A1111 source, not
+guessed), with any field the request sets explicitly taking precedence.
 """
 
 from __future__ import annotations
@@ -50,8 +59,9 @@ from pydantic import BaseModel, Field
 from harness.api.auth import require_auth
 from harness.artifacts.service import store_and_record_artifact
 from harness.core.app import Application
-from harness.core.domain import Artifact, CreativeAsset, CreativeInstallation
+from harness.core.domain import Artifact, CreativeAsset, CreativeInstallation, CreativeProfile
 from harness.core.errors import NotFoundError, ValidationFailedError
+from harness.core.ids import new_id
 from harness.core.settings_schema import SettingsSchema
 from harness.hosts.resolve import build_ssh_host
 from harness.jobs.manager import JobHandle
@@ -242,8 +252,50 @@ class CreativeJobRequest(BaseModel):
     # AUTOMATIC1111-compatible (direct txt2img/img2img call):
     operation: Literal["txt2img", "img2img"] | None = None
     params: dict[str, Any] | None = None
+    # CRE-007: a Creative Profile preset to drive this generation from. Its
+    # engine_selector must match engine_id; explicit fields above always
+    # win over the profile's own defaults.
+    profile_id: str | None = None
     session_id: str | None = None
     workspace_id: str | None = None
+
+
+def _merge_a1111_profile_params(profile: CreativeProfile, params: dict[str, Any]) -> dict[str, Any]:
+    """Applies a Checkpoint Profile bundle (checkpoint/vae/sampler/
+    scheduler/loras) as real AUTOMATIC1111 txt2img/img2img request fields,
+    verified directly from `modules/processing.py`/`extra_networks_lora.py`
+    source: checkpoint/VAE go in `override_settings` (A1111 itself restores
+    the prior values after the request), sampler/scheduler are top-level
+    fields, and LoRAs have no structured field at all in this API -- they
+    are applied by appending `<lora:name:1.0>` tokens to the prompt string,
+    the built-in Lora extension's only mechanism. Explicit request
+    ``params`` always win over the profile's own defaults.
+    """
+    override_settings: dict[str, Any] = {}
+    if profile.checkpoint is not None:
+        override_settings["sd_model_checkpoint"] = profile.checkpoint
+    if profile.vae is not None:
+        override_settings["sd_vae"] = profile.vae
+
+    merged: dict[str, Any] = {}
+    if override_settings:
+        merged["override_settings"] = override_settings
+    if profile.sampler is not None:
+        merged["sampler_name"] = profile.sampler
+    if profile.scheduler is not None:
+        merged["scheduler"] = profile.scheduler
+
+    for key, value in params.items():
+        if key == "override_settings" and isinstance(value, dict) and merged.get(key):
+            merged[key] = {**merged[key], **value}
+        else:
+            merged[key] = value
+
+    if profile.loras:
+        lora_tags = "".join(f"<lora:{name}:1.0>" for name in profile.loras)
+        merged["prompt"] = merged.get("prompt", "") + lora_tags
+
+    return merged
 
 
 @router.post("/creative/jobs", status_code=202)
@@ -254,11 +306,23 @@ async def submit_creative_job(request: Request, body: CreativeJobRequest) -> Job
     """
     app = _app(request)
 
+    profile: CreativeProfile | None = None
+    if body.profile_id is not None:
+        profile = await app.creative_profiles.get(body.profile_id)  # 404s if unknown
+        if profile.engine_selector != body.engine_id:
+            raise ValidationFailedError(
+                f"profile {profile.name!r} targets engine "
+                f"{profile.engine_selector!r}, not {body.engine_id!r}"
+            )
+
     if body.engine_id == "comfyui":
         if body.workflow is not None:
             graph = body.workflow
         elif body.workflow_artifact_id is not None:
             artifact = await app.artifacts.get(body.workflow_artifact_id)  # 404s if unknown
+            graph = json.loads(app.artifact_blobs.get(artifact.sha256))
+        elif profile is not None and profile.workflow_artifact_id is not None:
+            artifact = await app.artifacts.get(profile.workflow_artifact_id)
             graph = json.loads(app.artifact_blobs.get(artifact.sha256))
         else:
             raise ValidationFailedError("either workflow or workflow_artifact_id is required")
@@ -276,13 +340,17 @@ async def submit_creative_job(request: Request, body: CreativeJobRequest) -> Job
         return await app.job_manager.submit("creative.comfyui.generate", comfyui_work)
 
     assert body.engine_id in _A1111_COMPATIBLE_ENGINE_IDS  # the only other Literal values
-    if body.operation is None or body.params is None:
+    if body.operation is None:
+        raise ValidationFailedError("operation is required for an AUTOMATIC1111-compatible engine")
+    if body.params is None and profile is None:
         raise ValidationFailedError(
-            "operation and params are required for an AUTOMATIC1111-compatible engine"
+            "params is required for an AUTOMATIC1111-compatible engine without a profile"
         )
     engine_id = body.engine_id
     operation = body.operation
-    params = body.params
+    params = (
+        _merge_a1111_profile_params(profile, body.params or {}) if profile else (body.params or {})
+    )
 
     async def a1111_work(handle: JobHandle) -> dict[str, Any]:
         return await run_a1111_generation(
@@ -389,3 +457,40 @@ async def _asset_with_locations(app: Application, asset_id: str) -> CreativeAsse
         **asset.model_dump(),
         locations=[AssetLocationInfo(host_id=loc.host_id, path=loc.path) for loc in locations],
     )
+
+
+class CreativeProfileCreate(BaseModel):
+    name: str
+    engine_selector: str
+    workflow_artifact_id: str | None = None
+    checkpoint: str | None = None
+    vae: str | None = None
+    loras: list[str] = Field(default_factory=list)
+    sampler: str | None = None
+    scheduler: str | None = None
+    settings: dict[str, Any] = Field(default_factory=dict)
+    prefer_loaded_asset: bool = False
+
+
+_VALID_ENGINE_SELECTORS = frozenset({"comfyui"}) | _A1111_COMPATIBLE_ENGINE_IDS
+
+
+@router.post("/creative/profiles", status_code=201)
+async def create_profile(request: Request, body: CreativeProfileCreate) -> CreativeProfile:
+    if body.engine_selector not in _VALID_ENGINE_SELECTORS:
+        raise ValidationFailedError(f"unknown engine_selector: {body.engine_selector}")
+    app = _app(request)
+    if body.workflow_artifact_id is not None:
+        await app.artifacts.get(body.workflow_artifact_id)  # 404s if unknown
+    profile = CreativeProfile(id=new_id("prof"), **body.model_dump())
+    return await app.creative_profiles.create(profile)
+
+
+@router.get("/creative/profiles")
+async def list_profiles(request: Request) -> list[CreativeProfile]:
+    return await _app(request).creative_profiles.list()
+
+
+@router.get("/creative/profiles/{profile_id}")
+async def get_profile(request: Request, profile_id: str) -> CreativeProfile:
+    return await _app(request).creative_profiles.get(profile_id)

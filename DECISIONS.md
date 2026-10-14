@@ -1107,3 +1107,57 @@ Format: decision / reason / alternatives / consequences.
   work, not assumed here. A package using `ModelDirectoryOverride` must
   have its real `models_root` passed explicitly; Harness has no way to
   detect the override itself today, and doesn't pretend to.
+
+## D-050 — Creative Profile: a Checkpoint Profile bundle maps to real A1111 request fields, verified from source; ComfyUI gets a default workflow_ref
+- Decision: CRE-007's `creative_profiles` table stores `engine_selector`
+  (`"comfyui"` or an AUTOMATIC1111-compatible family id -- `POST
+  /creative/jobs` rejects a `profile_id` whose `engine_selector` doesn't
+  match the request's `engine_id`), `workflow_artifact_id` (ComfyUI),
+  and a "Checkpoint Profile" bundle (`checkpoint`/`vae`/`loras`/`sampler`/
+  `scheduler`/`settings`) for the A1111-compatible family — explicitly not
+  a Persona (SPEC), a separate table with no routing through
+  contacts/personas at all.
+  - **The A1111 bundle maps to real request fields, verified directly
+    from AUTOMATIC1111/stable-diffusion-webui source**, not guessed:
+    `checkpoint`/`vae` go into the txt2img/img2img body's
+    `override_settings` dict (`modules/processing.py`'s `process_images()`
+    applies `opts.set(k, v, ...)` for each key, with a special-cased
+    `sd_models.reload_model_weights()` for `sd_model_checkpoint` and
+    `sd_vae.reload_vae_weights()` for `sd_vae`, then restores the prior
+    values afterward by default — a genuine per-request override, not a
+    separate stateful `/options` call this project would otherwise have
+    needed to sequence around). `sampler`/`scheduler` are real top-level
+    `StableDiffusionProcessing` fields (`sampler_name`/`scheduler`).
+    **LoRAs have no structured field in this API at all** — the built-in
+    Lora extension (`extensions-builtin/Lora/extra_networks_lora.py`)
+    only recognizes `<lora:name:weight>` tokens inside the `prompt`
+    string, so `_merge_a1111_profile_params` appends one such tag per
+    profile LoRA (weight fixed at 1.0 — no per-LoRA weight control is
+    claimed, since the profile schema doesn't carry one) to whatever
+    prompt the request supplies.
+  - **Explicit request `params` always win over the profile's defaults**
+    — a profile is a preset, not a lock; `override_settings` merges at
+    the inner-dict level (a request's own `sd_model_checkpoint` overrides
+    just that key, not the whole dict) so a request can override one
+    piece of a profile's bundle without having to restate the rest.
+  - **ComfyUI side needs no param-merging** — a profile's
+    `workflow_artifact_id` is used only when the request itself supplies
+    neither `workflow` nor `workflow_artifact_id`; SPEC's `workflow_ref`
+    is exactly this.
+  - **`prefer_loaded_asset` (SPEC's `placement`) is stored, not acted on**
+    — Harness has no live "which installation currently has this
+    checkpoint loaded" state to place a generation against yet; declaring
+    that this field drives engine selection today would be exactly the
+    kind of fake control AGENTS.md rules out.
+- Reason: SPEC's acceptance bar ("profile drives a generation on fixture
+  engine") requires the bundle to actually reach the wire in the engine's
+  real request shape, and A1111's own source is the only authority on
+  what that shape is — there's no published spec to rely on instead,
+  matching this project's existing A1111 adapter research discipline
+  (CRE-004).
+- Consequences: a profile's checkpoint/VAE aren't validated against
+  CRE-006's asset catalog or the engine's actual `sd_models()`/`sd_vae()`
+  listing at creation or use time — a profile naming a checkpoint that
+  doesn't exist on the target engine fails at generation time with
+  whatever error A1111 itself returns, not earlier. Cross-referencing
+  profiles against the asset catalog is future work, not assumed here.

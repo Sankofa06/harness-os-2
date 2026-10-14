@@ -5,8 +5,8 @@ _Last updated: 2026-08-07_
 ## Current milestone
 Milestones 1-6 are all fully done (kernel, control plane, language compute,
 execution, agent runtime, MCP + Skills). Milestone 7 (Creative compute) is in
-progress: CRE-001 through CRE-006 are all done — see the notes below. Next
-up is CRE-007 (Creative profiles).
+progress: CRE-001 through CRE-007 are all done — see the notes below. Next
+up is CRE-008 (Batch comparison).
 
 CRE-001: `harness.providers.creative.families`/`discovery` parses Stability
 Matrix's `<DataDir>/settings.json` (verified via source inspection — its
@@ -131,6 +131,28 @@ at two paths (even across two different hosts) catalogs as one asset with
 multiple locations. `models_root` is caller-supplied rather than derived
 from `data_dir`, since Harness doesn't read Stability Matrix's own
 `ModelDirectoryOverride` setting. See D-049.
+
+CRE-007: `creative_profiles` stores a reusable generation preset (SPEC
+"Creative Profile") — explicitly not a Persona, a separate table with no
+routing through contacts/personas. `engine_selector` must match the
+engine_id a job is submitted against. For ComfyUI, a profile's
+`workflow_artifact_id` becomes the job's workflow only when the request
+itself supplies neither `workflow` nor `workflow_artifact_id`. For the
+AUTOMATIC1111-compatible family, the "Checkpoint Profile" bundle
+(checkpoint/VAE/sampler/scheduler/LoRAs) maps to real txt2img/img2img
+request fields verified directly from AUTOMATIC1111/stable-diffusion-webui
+source: checkpoint/VAE go in `override_settings` (A1111 itself restores
+the prior values after the request), sampler/scheduler are top-level
+fields, and LoRAs — which have no structured field in this API at all —
+are applied by appending `<lora:name:1.0>` tokens to the prompt, the
+built-in Lora extension's only mechanism. Explicit request params always
+win over the profile's defaults, merged at the inner-dict level for
+`override_settings`. SPEC's `placement`/`prefer_loaded_asset` is stored
+but drives no engine-selection behavior yet — there's no live
+"which installation has this checkpoint loaded" state to place against.
+Proven end to end against real local fixture A1111/ComfyUI servers,
+including that explicit request params override a profile's defaults.
+See D-050.
 
 SKL-002: `harness.skills.superpowers.BUNDLES` declares the seven seed
 bundles (Coding, Git/GitHub, Browser, Creative, Research, Remote Host,
@@ -348,8 +370,8 @@ from persisted Runs/ToolRuns on every request rather than a separately
 maintained structure, so it can't drift from what actually happened.
 
 ## Active task
-CRE-001 through CRE-006 are all done (see Current milestone above). Next per
-`TASKS.md` is CRE-007 (Creative profiles).
+CRE-001 through CRE-007 are all done (see Current milestone above). Next per
+`TASKS.md` is CRE-008 (Batch comparison).
 
 ## Completed milestones
 - Phase 1: full spec-kit reading pass (all `SPEC/`, `ADR/`, `BUILD/`, `TESTING/`,
@@ -407,7 +429,7 @@ asyncio interaction, not an application bug.
 None.
 
 ## Architectural decisions made during implementation
-See `DECISIONS.md` for the full list (D-001 through D-049). Notable ones affecting
+See `DECISIONS.md` for the full list (D-001 through D-050). Notable ones affecting
 what's built so far:
 - D-003/D-004: SQLAlchemy async + plain SQL migrations, schema grows incrementally
   per subsystem milestone rather than all at once.
@@ -422,7 +444,7 @@ what's built so far:
 - D-014: license selection is deferred to the project owner (placeholder in place).
 
 ## What is NOT yet built
-the rest of creative compute (profiles, batch comparison, provenance),
+the rest of creative compute (batch comparison, provenance),
 analytics/benchmarks, the Node daemon, the rest of the WebUI
 (graph/compute/models/creative/assets/analytics/approvals views, full
 three-panel IA, context meter, accessibility audit), TUI feature
@@ -457,7 +479,7 @@ HARNESS_DEMO_MODE=1 uv run harness serve
 
 Test suites:
 ```bash
-uv run pytest tests -q                      # backend: 407 tests
+uv run pytest tests -q                      # backend: 413 tests
 cd web && npm run test                      # web unit: vitest
 cd web && npx playwright test               # web e2e (needs both servers running)
 ```

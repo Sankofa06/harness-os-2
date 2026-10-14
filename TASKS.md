@@ -390,7 +390,7 @@ Task format: ID — title / description / deps / components / acceptance / tests
 - Desc: creative_profiles per SPEC (selector/settings/placement; checkpoint-profile bundles); not personas.
 - Deps: CRE-006. Components: providers.creative, api.
 - Acceptance: profile drives a generation on fixture engine.
-- Tests: integration test. Status: TODO
+- Tests: integration test. Status: DONE
 
 ### CRE-008 Batch comparison
 - Desc: one prompt × N checkpoints/profiles, controlled seeds, sequential/parallel, capacity-aware placement, grid artifact, run metrics.

@@ -493,6 +493,36 @@ class CreativeAssetLocation(BaseModel):
     discovered_at: str = ""
 
 
+class CreativeProfile(BaseModel):
+    """A reusable generation preset (CRE-007, SPEC/CREATIVE_COMPUTE.md
+    "Creative Profile") -- explicitly not a Persona (SPEC: "Do not call
+    these Personas in the data model"). ``engine_selector`` is the engine
+    this profile targets (``"comfyui"``, or one of the AUTOMATIC1111-
+    compatible family ids) -- driving a generation against a mismatched
+    ``engine_id`` is rejected. ``workflow_artifact_id`` is used for
+    ComfyUI-shaped profiles (the workflow graph to run); ``checkpoint``/
+    ``vae``/``loras``/``sampler``/``scheduler``/``settings`` form a
+    "Checkpoint Profile" bundle for the AUTOMATIC1111-compatible family's
+    direct txt2img/img2img call. ``prefer_loaded_asset`` is recorded as
+    stated intent (SPEC's ``placement``) but drives no engine-selection
+    behavior today -- Harness has no live "which installation currently
+    has this checkpoint loaded" state to place against yet.
+    """
+
+    id: str
+    name: str
+    engine_selector: str
+    workflow_artifact_id: str | None = None
+    checkpoint: str | None = None
+    vae: str | None = None
+    loras: list[str] = Field(default_factory=list)
+    sampler: str | None = None
+    scheduler: str | None = None
+    settings: dict[str, Any] = Field(default_factory=dict)
+    prefer_loaded_asset: bool = False
+    created_at: str = ""
+
+
 class RunMetrics(BaseModel):
     run_id: str
     input_tokens: int | None = None

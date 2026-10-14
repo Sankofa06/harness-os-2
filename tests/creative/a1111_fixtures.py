@@ -36,7 +36,11 @@ def create_fake_a1111_app(
     "works vs fake A1111 server exposing partial capabilities").
     """
     app = FastAPI()
-    state = {"progress_calls": 0, "interrupted": False}
+    state: dict[str, Any] = {
+        "progress_calls": 0,
+        "interrupted": False,
+        "last_txt2img_body": None,
+    }
 
     if "options" not in omit_endpoints:
 
@@ -105,6 +109,7 @@ def create_fake_a1111_app(
         @app.post("/sdapi/v1/txt2img")
         async def txt2img(request: Request) -> dict[str, Any]:
             body = await request.json()
+            state["last_txt2img_body"] = body
             await asyncio.sleep(generation_delay_seconds)
             return {
                 "images": [FAKE_IMAGE_B64],
