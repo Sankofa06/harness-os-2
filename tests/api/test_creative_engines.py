@@ -14,11 +14,13 @@ async def test_list_engines_returns_all_families(client) -> None:
     engines = resp.json()
     assert len(engines) == 22
     by_id = {e["id"]: e for e in engines}
-    # ComfyUI (CRE-003) and the AUTOMATIC1111-compatible family (CRE-004)
-    # have real adapters; everyone else stays honest.
+    # ComfyUI (CRE-003), the AUTOMATIC1111-compatible family (CRE-004), and
+    # everything else at its honest launch_fs/native-detection tier
+    # (CRE-005) all have real, if differently-deep, implementations now.
     assert by_id["comfyui"]["implemented"] is True
     assert by_id["automatic1111"]["implemented"] is True
-    assert by_id["invokeai"]["implemented"] is False
+    assert by_id["invokeai"]["implemented"] is True
+    assert by_id["fooocus"]["implemented"] is True
 
 
 @pytest.mark.asyncio
@@ -53,16 +55,23 @@ async def test_engine_capabilities_endpoint_matches_engine_listing(client) -> No
 
 
 @pytest.mark.asyncio
-async def test_unimplemented_engine_capabilities_stay_honest(client) -> None:
-    capabilities = (await client.get("/api/v1/creative/engines/invokeai/capabilities")).json()
-    assert capabilities["implemented"] is False
+async def test_fooocus_family_declares_the_lighter_launch_fs_tier_honestly(client) -> None:
+    """Fooocus has no documented control API — its capability_set must stay
+    at the generic launch/health level CRE-005 actually built, never claim
+    generation verbs it can't back (SPEC: "no fake controls").
+    """
+    capabilities = (await client.get("/api/v1/creative/engines/fooocus/capabilities")).json()
+    assert capabilities["api_strategy"] == "launch_fs"
+    assert "txt2img" not in capabilities["capability_set"]
+    assert {"launch", "health_check"} <= set(capabilities["capability_set"])
+    assert capabilities["implemented"] is True
 
 
 @pytest.mark.asyncio
 async def test_engine_settings_schema_is_generic_launch_args_only(client) -> None:
-    """No engine has a live adapter yet, so the settings schema must not
-    fabricate engine-specific fields — only the genuinely real,
-    Stability-Matrix-tracked launch-args concept.
+    """No engine has settings-schema-validated per-request fields yet, so
+    the settings schema must not fabricate engine-specific fields — only
+    the genuinely real, Stability-Matrix-tracked launch-args concept.
     """
     resp = await client.get("/api/v1/creative/engines/comfyui/settings-schema")
     assert resp.status_code == 200

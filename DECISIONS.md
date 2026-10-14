@@ -979,3 +979,72 @@ Format: decision / reason / alternatives / consequences.
   `extra_batch_images`/`set_options` are implemented and tested on
   `A1111Client` but, like ComfyUI's `interrupt`/`upload_image` (D-046), not
   yet wired into the generation flow or a REST route.
+
+## D-048 — Remaining 14 families: generic launch_fs via existing Tool lifecycle, InvokeAI gets real detection, StableSwarmUI's tier corrected
+- Decision: CRE-005 brings every remaining family to `implemented=True` at
+  whatever tier it can honestly claim — never implying more than that tier
+  promises:
+  - **Generic launch_fs** (Fooocus and its 5 variants, StableSwarmUI, SDFX,
+    VoltaML, Kohya GUI/OneTrainer/FluxGym, CogStudio — none of which have a
+    documented control API): `harness.providers.creative.launch_fs.
+    check_reachable` is a plain HTTP GET (any response, even non-2xx, counts
+    as reachable — a Gradio app's root page commonly isn't 200) for the
+    "health" half; `creative.launch_engine` and `creative.launch_training`
+    are plain native Tools (TOOL-001) that SSH-exec an already-discovered
+    installation's own recorded `launch_command` (CRE-001) via `SSHHost.
+    exec_stream`, for the "launch" half. Deliberately *not* wrapped in a
+    second Job layer of their own: `POST /tools/{name}/run` already wraps
+    every tool call in a Job and resolves permission through PERM-001
+    *before* the handler runs, so reusing that lifecycle is what makes
+    "explicit user approval" and cancellation-stops-the-remote-process real
+    (canceling the Job cancels the task iterating `exec_stream`, which
+    closes the SSH connection in its own `finally`) rather than a second,
+    parallel mechanism built just for this. A nested
+    `job_manager.submit()` inside the handler was the first draft and was
+    rejected during design: it would have created a confusing Job-within-
+    a-Job, and `PermissionEngine.resolve()` requires a real `tool_runs.id`
+    (FK-enforced) to log a decision against, which only the Tool lifecycle
+    provides.
+  - **Training specifically** gets its own tool, `creative.launch_training`
+    (permission class `training`, not `execute`) — SPEC: "Treat training as
+    Jobs with explicit user approval... not implicitly available to LLM
+    agents." Both tools call the same launch implementation and each
+    rejects installations from the other's family group in code (not just
+    convention), proven by a test that a training installation fails
+    through `creative.launch_engine` and vice versa.
+  - **InvokeAI** gets a second, more specific check beyond the generic one:
+    `harness.providers.creative.invokeai.detect.detect_invokeai` calls its
+    real, unauthenticated `GET /api/v1/app/version` (verified directly from
+    source — `invokeai/app/api/routers/app_info.py` — after a first
+    WebFetch-based research pass returned a plausible-looking but
+    fabricated answer that a direct source fetch caught) and confirms the
+    response actually has the expected `{"version": str}` shape, returning
+    `None` (not raising) for "reachable but not InvokeAI" — distinct from
+    `ProviderError` for "unreachable at all." This is the real, specific
+    "native API... if detected" SPEC calls for, not just generic
+    reachability.
+  - **Correction**: `stableswarmui`'s `api_strategy` is downgraded from
+    `http_adapter` (CRE-002's original declaration, assuming it transparently
+    wraps ComfyUI's API) to `launch_fs`. No independent source verification
+    ever backed that claim — unlike ComfyUI itself — so leaving it
+    standing while building out CRE-005's honest-tier discipline everywhere
+    else would have been exactly the kind of overclaim this milestone exists
+    to rule out.
+  - **Video family** (CogStudio) needed no new code — CRE-001/002 already
+    represent it honestly (`launch_fs`, `implemented=False` until now); it
+    now shares the same generic launch_fs tier as everything else in this
+    decision.
+- Reason: a generic, protocol-agnostic health+launch mechanism is the
+  actual ceiling SPEC describes for engines with no documented API
+  ("Prefer launch/health/read-only... unless a reliable local API is
+  explicitly detected") — building 8 separate fake-specific adapters would
+  either overclaim capability or require guessing undocumented protocols,
+  both ruled out by this project's standing bar.
+- Consequences: "read_only_asset_discovery" (part of `_LAUNCH_FS_CAPABILITIES`)
+  remains declared but unimplemented — discovering an engine's actual
+  checkpoints/LoRAs without a control API means reading its Models
+  directory over SFTP, which is CRE-006's job (Creative assets catalog),
+  not CRE-005's. `creative.launch_engine`/`creative.launch_training` have no
+  built-in log-capture-to-Artifact or resource estimates yet (SPEC also
+  mentions these for training); the output tail capped at 200 lines and
+  streamed as events is the real, tested capability today.

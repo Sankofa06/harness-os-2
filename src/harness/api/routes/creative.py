@@ -1,6 +1,7 @@
 """Stability Matrix installation discovery + engine capability model +
-ComfyUI/A1111 generation endpoints (CRE-001/CRE-002/CRE-003/CRE-004,
-SPEC/CREATIVE_COMPUTE.md, SPEC/API_CONTRACT.md).
+ComfyUI/A1111/launch_fs generation endpoints
+(CRE-001/CRE-002/CRE-003/CRE-004/CRE-005, SPEC/CREATIVE_COMPUTE.md,
+SPEC/API_CONTRACT.md).
 
 Discovery reads `<data_dir>/settings.json` from a registered SSH Host via
 the same `SSHHost.read_file`/workspace-root containment HOST-002 already
@@ -11,7 +12,9 @@ is SSH-only today; that's a real, declared limitation, not a placeholder.
 The `/creative/engines*` routes serve `harness.providers.creative.families`'s
 declarative catalog directly — every engine's `implemented` field reflects
 whether a live adapter actually exists (ComfyUI since CRE-003; the
-AUTOMATIC1111-compatible family since CRE-004).
+AUTOMATIC1111-compatible family since CRE-004; everything else — Fooocus and
+its variants, StableSwarmUI, SDFX, VoltaML, InvokeAI, the training engines,
+CogStudio — at the lighter launch_fs/native-detection level since CRE-005).
 
 `/creative/workflows` stores a workflow graph as an Artifact (ART-001) —
 referenced by id, never inlined into any LLM-facing context.
@@ -21,6 +24,13 @@ be a fake control. ComfyUI's job is workflow-graph-based (`workflow`/
 `workflow_artifact_id`); the A1111-compatible family's is a direct
 txt2img/img2img call (`operation`/`params`) — the two protocols are
 genuinely different shapes, not forced into one.
+
+`POST /creative/health-check` and `POST /creative/invokeai/detect` are the
+generic launch_fs reachability check and InvokeAI's specific native-API
+detection, respectively; `creative.launch_engine`/`creative.launch_training`
+(registered as native Tools, not REST routes here — see
+`harness.providers.creative.launch_fs`) launch an already-discovered
+installation's own recorded command over SSH.
 """
 
 from __future__ import annotations
@@ -44,6 +54,8 @@ from harness.providers.creative.a1111.adapter import run_a1111_generation
 from harness.providers.creative.comfyui.adapter import run_comfyui_generation
 from harness.providers.creative.discovery import parse_installed_packages
 from harness.providers.creative.families import FAMILIES, FAMILIES_BY_ID
+from harness.providers.creative.invokeai.detect import detect_invokeai
+from harness.providers.creative.launch_fs import check_reachable
 
 router = APIRouter(dependencies=[Depends(require_auth)], tags=["creative"])
 
@@ -157,10 +169,12 @@ async def get_engine_capabilities(request: Request, engine_id: str) -> CreativeE
 
 @router.get("/creative/engines/{engine_id}/settings-schema")
 async def get_engine_settings_schema(request: Request, engine_id: str) -> dict[str, Any]:
-    """No engine has a live adapter yet (CRE-003 onward), so there are no
-    engine-specific settings fields to validate — only the one thing every
-    Stability-Matrix-managed package genuinely supports today (CRE-001:
-    each install already carries its own launch command/args).
+    """No engine has settings-schema-validated per-request fields yet — only
+    the one thing every Stability-Matrix-managed package genuinely supports
+    today (CRE-001: each install already carries its own launch command/
+    args). ComfyUI/A1111 generation requests pass their own request bodies
+    directly (`workflow`/`operation`+`params`), validated by their own
+    Pydantic models rather than this namespaced schema.
     """
     _engine_info(engine_id)  # 404s for an unknown engine id
     schema = SettingsSchema(
@@ -282,3 +296,40 @@ async def submit_creative_job(request: Request, body: CreativeJobRequest) -> Job
 async def list_creative_jobs(request: Request) -> list[Job]:
     jobs = await _app(request).jobs.list()
     return [j for j in jobs if j.type.startswith("creative.")]
+
+
+class HealthCheckRequest(BaseModel):
+    base_url: str
+
+
+class HealthCheckResult(BaseModel):
+    reachable: bool
+
+
+@router.post("/creative/health-check")
+async def health_check(request: Request, body: HealthCheckRequest) -> HealthCheckResult:
+    """The generic launch_fs-tier "health" check (CRE-005) — a plain HTTP
+    reachability probe, since most families here have no documented API to
+    check anything more specific.
+    """
+    return HealthCheckResult(reachable=await check_reachable(body.base_url))
+
+
+class InvokeAIDetectRequest(BaseModel):
+    base_url: str
+
+
+class InvokeAIDetectResult(BaseModel):
+    detected: bool
+    version: str | None = None
+
+
+@router.post("/creative/invokeai/detect")
+async def invokeai_detect(request: Request, body: InvokeAIDetectRequest) -> InvokeAIDetectResult:
+    """InvokeAI's own native-API detection (CRE-005) — distinct from the
+    generic health check above, this confirms the server actually answers
+    InvokeAI's real `/api/v1/app/version` endpoint, not just that something
+    is listening (SPEC: "Use its native API if detected").
+    """
+    version = await detect_invokeai(body.base_url)
+    return InvokeAIDetectResult(detected=version is not None, version=version)

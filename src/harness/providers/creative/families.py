@@ -115,7 +115,6 @@ _COMFYUI_CAPABILITIES = (
     "output_capture",
     "asset_discovery",
 )
-_STABLESWARMUI_CAPABILITIES = ("health", "queue", "workflow_submit", "progress_events")
 
 _INVOKEAI_ASSET_TYPES = ("checkpoint", "lora", "vae", "controlnet", "image")
 _INVOKEAI_CAPABILITIES = ("native_api_discovery", "capability_mapping")
@@ -242,6 +241,7 @@ FAMILIES: tuple[CreativePackageFamily, ...] = (
         api_strategy="launch_fs",
         asset_types=_FOOOCUS_ASSET_TYPES,
         capability_set=_LAUNCH_FS_CAPABILITIES,
+        implemented=True,
     ),
     CreativePackageFamily(
         id="fooocus_controlnet_sdxl",
@@ -253,6 +253,7 @@ FAMILIES: tuple[CreativePackageFamily, ...] = (
         api_strategy="launch_fs",
         asset_types=(*_FOOOCUS_ASSET_TYPES, "controlnet"),
         capability_set=_LAUNCH_FS_CAPABILITIES,
+        implemented=True,
     ),
     CreativePackageFamily(
         id="ruined_fooocus",
@@ -264,6 +265,7 @@ FAMILIES: tuple[CreativePackageFamily, ...] = (
         api_strategy="launch_fs",
         asset_types=_FOOOCUS_ASSET_TYPES,
         capability_set=_LAUNCH_FS_CAPABILITIES,
+        implemented=True,
     ),
     CreativePackageFamily(
         id="fooocus_1up",
@@ -275,6 +277,7 @@ FAMILIES: tuple[CreativePackageFamily, ...] = (
         api_strategy="launch_fs",
         asset_types=_FOOOCUS_ASSET_TYPES,
         capability_set=_LAUNCH_FS_CAPABILITIES,
+        implemented=True,
     ),
     CreativePackageFamily(
         id="simplesdxl",
@@ -286,6 +289,7 @@ FAMILIES: tuple[CreativePackageFamily, ...] = (
         api_strategy="launch_fs",
         asset_types=_FOOOCUS_ASSET_TYPES,
         capability_set=_LAUNCH_FS_CAPABILITIES,
+        implemented=True,
     ),
     CreativePackageFamily(
         id="fooocus",
@@ -297,6 +301,12 @@ FAMILIES: tuple[CreativePackageFamily, ...] = (
         api_strategy="launch_fs",
         asset_types=_FOOOCUS_ASSET_TYPES,
         capability_set=_LAUNCH_FS_CAPABILITIES,
+        # CRE-005 added the generic launch_fs tier (reachability health-check
+        # + SSH-launch-by-recorded-command via harness.providers.creative.
+        # launch_fs) that every Fooocus-family/training/video family below
+        # now genuinely has — none of them have a documented control API, so
+        # this lighter tier (not a fake deeper one) is the honest ceiling.
+        implemented=True,
     ),
     CreativePackageFamily(
         id="comfyui",
@@ -318,9 +328,16 @@ FAMILIES: tuple[CreativePackageFamily, ...] = (
         name_patterns=("swarmui", "stableswarm"),
         supported_platforms=("windows", "linux", "macos"),
         acceleration_backends=_ALL_PLATFORM_BACKENDS,
-        api_strategy="http_adapter",
+        # CRE-005 correction: CRE-002 originally declared this http_adapter
+        # with a ComfyUI-shaped capability_set on the assumption it wraps
+        # ComfyUI's own API — no independent source verification backs that
+        # claim (unlike ComfyUI itself), so it's downgraded to the tier
+        # that's actually proven: launch_fs. Revisit if a real StableSwarmUI
+        # API adapter is ever verified and built.
+        api_strategy="launch_fs",
         asset_types=_NODE_WORKFLOW_ASSET_TYPES,
-        capability_set=_STABLESWARMUI_CAPABILITIES,
+        capability_set=_LAUNCH_FS_CAPABILITIES,
+        implemented=True,
     ),
     CreativePackageFamily(
         id="sdfx",
@@ -332,6 +349,7 @@ FAMILIES: tuple[CreativePackageFamily, ...] = (
         api_strategy="launch_fs",
         asset_types=_NODE_WORKFLOW_ASSET_TYPES,
         capability_set=_LAUNCH_FS_CAPABILITIES,
+        implemented=True,
     ),
     CreativePackageFamily(
         id="voltaml",
@@ -343,6 +361,7 @@ FAMILIES: tuple[CreativePackageFamily, ...] = (
         api_strategy="launch_fs",
         asset_types=("checkpoint", "lora", "vae", "image"),
         capability_set=_LAUNCH_FS_CAPABILITIES,
+        implemented=True,
     ),
     CreativePackageFamily(
         id="invokeai",
@@ -354,6 +373,10 @@ FAMILIES: tuple[CreativePackageFamily, ...] = (
         api_strategy="native_api",
         asset_types=_INVOKEAI_ASSET_TYPES,
         capability_set=_INVOKEAI_CAPABILITIES,
+        # CRE-005 added real native-API detection (harness.providers.
+        # creative.invokeai.detect, GET /api/v1/app/version, verified via
+        # source) — detection only, not a generation adapter yet.
+        implemented=True,
     ),
     CreativePackageFamily(
         id="kohya_gui",
@@ -365,6 +388,7 @@ FAMILIES: tuple[CreativePackageFamily, ...] = (
         api_strategy="launch_fs",
         asset_types=_TRAINING_ASSET_TYPES,
         capability_set=_LAUNCH_FS_CAPABILITIES,
+        implemented=True,
     ),
     CreativePackageFamily(
         id="onetrainer",
@@ -376,6 +400,7 @@ FAMILIES: tuple[CreativePackageFamily, ...] = (
         api_strategy="launch_fs",
         asset_types=_TRAINING_ASSET_TYPES,
         capability_set=_LAUNCH_FS_CAPABILITIES,
+        implemented=True,
     ),
     CreativePackageFamily(
         id="fluxgym",
@@ -387,6 +412,7 @@ FAMILIES: tuple[CreativePackageFamily, ...] = (
         api_strategy="launch_fs",
         asset_types=_TRAINING_ASSET_TYPES,
         capability_set=_LAUNCH_FS_CAPABILITIES,
+        implemented=True,
     ),
     CreativePackageFamily(
         id="cogstudio",
@@ -398,6 +424,7 @@ FAMILIES: tuple[CreativePackageFamily, ...] = (
         api_strategy="launch_fs",
         asset_types=_VIDEO_ASSET_TYPES,
         capability_set=_LAUNCH_FS_CAPABILITIES,
+        implemented=True,
     ),
 )
 

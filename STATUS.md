@@ -5,10 +5,8 @@ _Last updated: 2026-08-07_
 ## Current milestone
 Milestones 1-6 are all fully done (kernel, control plane, language compute,
 execution, agent runtime, MCP + Skills). Milestone 7 (Creative compute) is in
-progress: CRE-001 (Stability Matrix discovery), CRE-002 (Engine capability
-model), CRE-003 (ComfyUI deep adapter), and CRE-004 (A1111/Forge-compatible
-adapter) are all done — see the notes below. Next up is CRE-005 (remaining
-families at honest levels).
+progress: CRE-001 through CRE-005 are all done — see the notes below. Next
+up is CRE-006 (Creative assets catalog).
 
 CRE-001: `harness.providers.creative.families`/`discovery` parses Stability
 Matrix's `<DataDir>/settings.json` (verified via source inspection — its
@@ -85,6 +83,31 @@ server, including a variant that omits endpoints entirely to prove
 generation still succeeds when only unrelated capabilities are missing, and
 fails cleanly (not a crash) when the actually-requested operation is
 missing. See D-047.
+
+CRE-005: every remaining family now flips to `implemented=True` at whatever
+tier it can honestly claim. For the 14 families with no documented control
+API (Fooocus and its 5 variants, StableSwarmUI, SDFX, VoltaML, the training
+engines, CogStudio), `harness.providers.creative.launch_fs` provides the
+real "launch_fs" tier: `check_reachable` is a generic HTTP GET for "health",
+and `creative.launch_engine`/`creative.launch_training` are plain native
+Tools that SSH-exec an installation's own recorded `launch_command`
+(CRE-001) via `SSHHost.exec_stream` for "launch" — deliberately *not*
+wrapped in a second Job layer, since `POST /tools/{name}/run` already wraps
+every tool call in a Job and resolves permission through PERM-001 first, so
+reusing that lifecycle is what makes "explicit user approval" and
+cancellation-stops-the-remote-process real. Training specifically gets its
+own tool (`creative.launch_training`, permission class `training`, not
+`execute`) per SPEC's explicit call-out that training is "not implicitly
+available to LLM agents" — both tools reject installations from the other's
+family group in code, not just convention. InvokeAI additionally gets a
+specific native-API detector (`invokeai.detect.detect_invokeai`, calling
+its real `GET /api/v1/app/version`, verified directly from source after a
+first web-research pass returned a fabricated answer a direct source fetch
+caught) distinct from generic reachability. `stableswarmui`'s capability
+tier was also corrected down from an unverified `http_adapter` overclaim
+(CRE-002) to the honest `launch_fs`. Proven against real local fixture
+servers and a real local SSH server, including that canceling a launch Job
+actually stops the remote `sleep`. See D-048.
 
 SKL-002: `harness.skills.superpowers.BUNDLES` declares the seven seed
 bundles (Coding, Git/GitHub, Browser, Creative, Research, Remote Host,
@@ -302,8 +325,8 @@ from persisted Runs/ToolRuns on every request rather than a separately
 maintained structure, so it can't drift from what actually happened.
 
 ## Active task
-CRE-001 through CRE-004 are all done (see Current milestone above). Next per
-`TASKS.md` is CRE-005 (remaining families at honest levels).
+CRE-001 through CRE-005 are all done (see Current milestone above). Next per
+`TASKS.md` is CRE-006 (Creative assets catalog).
 
 ## Completed milestones
 - Phase 1: full spec-kit reading pass (all `SPEC/`, `ADR/`, `BUILD/`, `TESTING/`,
@@ -361,7 +384,7 @@ asyncio interaction, not an application bug.
 None.
 
 ## Architectural decisions made during implementation
-See `DECISIONS.md` for the full list (D-001 through D-047). Notable ones affecting
+See `DECISIONS.md` for the full list (D-001 through D-048). Notable ones affecting
 what's built so far:
 - D-003/D-004: SQLAlchemy async + plain SQL migrations, schema grows incrementally
   per subsystem milestone rather than all at once.
@@ -376,14 +399,13 @@ what's built so far:
 - D-014: license selection is deferred to the project owner (placeholder in place).
 
 ## What is NOT yet built
-the rest of creative compute (remaining engine families at honest read-only/
-launch levels, asset catalog, profiles, batch comparison, provenance),
-analytics/benchmarks, the Node daemon, the rest of the WebUI (graph/compute/
-models/creative/assets/analytics/approvals views, full three-panel IA,
-context meter, accessibility audit), TUI feature completion, demo mode
-content, screenshot automation, GitHub Pages site, and marketing copy. These
-are tracked as their own `TASKS.md` entries and proceed in dependency order
-per `BUILD/IMPLEMENTATION_PLAN.md`.
+the rest of creative compute (asset catalog, profiles, batch comparison,
+provenance), analytics/benchmarks, the Node daemon, the rest of the WebUI
+(graph/compute/models/creative/assets/analytics/approvals views, full
+three-panel IA, context meter, accessibility audit), TUI feature
+completion, demo mode content, screenshot automation, GitHub Pages site,
+and marketing copy. These are tracked as their own `TASKS.md` entries and
+proceed in dependency order per `BUILD/IMPLEMENTATION_PLAN.md`.
 
 ## Exact commands to run the currently working application
 
@@ -412,7 +434,7 @@ HARNESS_DEMO_MODE=1 uv run harness serve
 
 Test suites:
 ```bash
-uv run pytest tests -q                      # backend: 374 tests
+uv run pytest tests -q                      # backend: 387 tests
 cd web && npm run test                      # web unit: vitest
 cd web && npx playwright test               # web e2e (needs both servers running)
 ```

@@ -27,24 +27,26 @@ def test_every_family_declares_a_full_capability_model() -> None:
         assert family.capability_set, family.id
 
 
-def test_no_fake_controls_only_families_with_a_real_adapter_are_implemented() -> None:
+def test_no_fake_controls_every_family_is_implemented_at_its_honest_tier() -> None:
     """CRE-002's acceptance bar: `implemented` must track whether a live
     adapter actually exists, not what's merely declared possible. As of
-    CRE-004, ComfyUI (CRE-003) and the seven sd_webui-group families sharing
-    the AUTOMATIC1111-compatible adapter (CRE-004) have one; nothing else
-    does yet.
+    CRE-005, every family has one — ComfyUI (CRE-003) and the
+    AUTOMATIC1111-compatible family (CRE-004) at their deep-adapter tiers,
+    everything else at the lighter launch_fs/native-detection tier
+    (CRE-005) — but "implemented" never implies more than each family's own
+    declared `api_strategy` tier actually promises.
     """
-    implemented_ids = {f.id for f in FAMILIES if f.implemented}
-    assert implemented_ids == {
-        "comfyui",
-        "automatic1111",
-        "sdwebui_forge",
-        "sdwebui_reforge",
-        "sdwebui_amdgpu_forge",
-        "sdwebui_ux",
-        "sdnext",
-        "automatic1111_directml",
-    }
+    assert all(family.implemented for family in FAMILIES)
+    for family in FAMILIES:
+        if family.api_strategy in ("http_adapter", "compat_layer"):
+            # Deep-adapter tiers: capability_set includes real generation
+            # verbs, not just launch/health.
+            assert "launch" not in family.capability_set
+        elif family.api_strategy == "launch_fs":
+            assert {"launch", "health_check"} <= set(family.capability_set)
+        elif family.api_strategy == "native_api":
+            # InvokeAI: detection only, not a generation adapter.
+            assert "txt2img" not in family.capability_set
 
 
 def test_comfyui_is_http_adapter_tier_with_deep_capabilities() -> None:

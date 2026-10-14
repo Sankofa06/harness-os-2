@@ -53,6 +53,7 @@ from harness.persistence.repos_skills import SkillActivationRepo, SkillRepo
 from harness.persistence.repos_superpowers import SuperpowerRepo
 from harness.persistence.repos_tools import ToolRunRepo
 from harness.persistence.repos_workspaces import WorkspaceRepo
+from harness.providers.creative.launch_fs import register_creative_launch_tools
 from harness.providers.language.base import LanguageProvider
 from harness.providers.language.factory import build_provider
 from harness.providers.language.fake import FakeProvider
@@ -261,8 +262,10 @@ async def create_application(config: HarnessConfig | None = None) -> Application
         compiler=compiler,
         api_token=token,
     )
-    # Registered last: agents.delegate needs a fully-constructed Application to
-    # spawn real Runs through, so it can't be built alongside the other tools
-    # above (which only need the individual repos they close over).
+    # Registered last: agents.delegate and the creative launch tools need a
+    # fully-constructed Application to act through, so they can't be built
+    # alongside the other tools above (which only need the individual repos
+    # they close over).
     register_delegation_tool(tools, application)
+    register_creative_launch_tools(tools, application)
     return application

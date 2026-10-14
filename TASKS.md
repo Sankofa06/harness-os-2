@@ -378,7 +378,7 @@ Task format: ID — title / description / deps / components / acceptance / tests
 - Desc: InvokeAI native detection; Fooocus-family launch/health/read-only; training engines (Kohya/OneTrainer/FluxGym) as approval-gated Jobs; video family listed.
 - Deps: CRE-002, JOB-001, PERM-001. Components: providers.creative.
 - Acceptance: DoD "represented with capability level, not fake controls".
-- Tests: catalog + adapter-level tests. Status: TODO
+- Tests: catalog + adapter-level tests. Status: DONE
 
 ### CRE-006 Creative assets catalog
 - Desc: canonical asset types, hash/path dedupe across engines, creative_assets table.
